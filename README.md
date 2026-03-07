@@ -237,7 +237,7 @@ See the [LICENSE](LICENSE) file for full details.
 
 ## 👩‍💻 Author
 
-**Sneha** — Building technology for the farmers of India 🇮🇳
+**Snehasish** — Building technology for the farmers of India 🇮🇳
 
 <div align="center">
 
