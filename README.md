@@ -251,6 +251,6 @@ See the [LICENSE](LICENSE) file for full details.
 
 <br/>
 
-Made with ❤️ for Indian Farmers
+Made with ❤️ for all Indian Farmers
 
 </div>
