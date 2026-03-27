@@ -153,7 +153,16 @@ Create a `.env` file in the root:
 
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_or_anon_key
+# Optional backward compatibility (you can keep either one):
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Chatbot (optional fallback if Supabase Edge Function is unavailable)
+VITE_GROQ_API_KEY=your_groq_api_key
+VITE_GROQ_MODEL=llama-3.3-70b-versatile
+
+# Weather
+VITE_OPENWEATHERMAP_API_KEY=your_openweathermap_api_key
 ```
 
 > Get these from: Supabase Dashboard → Your Project → Settings → API

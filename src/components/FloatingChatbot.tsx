@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Send, Bot, User, Loader2, Sparkles, Leaf, CloudSun, TrendingUp, Bug } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Send, Bot, User, Loader2, Sparkles, MessageCircle, X, Leaf, CloudSun, TrendingUp, Bug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -19,7 +19,8 @@ const quickReplies = [
   { label: "Pest control for rice", icon: Bug },
 ];
 
-export default function Chatbot() {
+export default function FloatingChatbot() {
+  const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([
     { role: "assistant", content: "Namaste! 🙏 I'm your AI farming assistant. Ask me anything about crops, weather, soil, prices, or farming techniques. How can I help you today?" },
   ]);
@@ -29,8 +30,16 @@ export default function Chatbot() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (isOpen) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isOpen]);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -179,93 +188,131 @@ Guidelines:
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
-          <Sparkles className="w-5 h-5 text-accent" />
-        </div>
-        <div>
-          <h1 className="text-lg font-heading font-bold text-foreground">KrishiAI Assistant</h1>
-          <p className="text-xs text-muted-foreground">Powered by AI • Ask anything about farming</p>
-        </div>
-      </div>
+    <>
+      {/* Floating Chat Button */}
+      <motion.button
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full gradient-hero flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow"
+        aria-label="Toggle chatbot"
+      >
+        {isOpen ? (
+          <X className="w-6 h-6 text-primary-foreground" />
+        ) : (
+          <MessageCircle className="w-6 h-6 text-primary-foreground" />
+        )}
+      </motion.button>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 pb-4 pr-2">
-        {messages.map((msg, i) => (
+      {/* Chat Window */}
+      <AnimatePresence>
+        {isOpen && (
           <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-24 right-6 z-50 w-[380px] h-[500px] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-              msg.role === "user" ? "gradient-warm" : "gradient-hero"
-            }`}>
-              {msg.role === "user" ? <User className="w-4 h-4 text-secondary-foreground" /> : <Bot className="w-4 h-4 text-primary-foreground" />}
+            {/* Header */}
+            <div className="flex items-center gap-3 p-4 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">
+              <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-accent" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-sm font-heading font-bold text-foreground">KrishiAI Assistant</h2>
+                <p className="text-xs text-muted-foreground">Powered by AI • Ask anything about farming</p>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
             </div>
-            <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-              msg.role === "user"
-                ? "bg-primary text-primary-foreground rounded-br-md"
-                : "glass-card text-foreground rounded-bl-md"
-            }`}>
-              <p className="whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          </motion.div>
-        ))}
 
-        {isLoading && messages[messages.length - 1]?.role === "user" && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-            <div className="w-8 h-8 rounded-lg gradient-hero flex items-center justify-center shrink-0">
-              <Bot className="w-4 h-4 text-primary-foreground" />
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto space-y-4 p-4">
+              {messages.map((msg, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    msg.role === "user" ? "gradient-warm" : "gradient-hero"
+                  }`}>
+                    {msg.role === "user" ? <User className="w-4 h-4 text-secondary-foreground" /> : <Bot className="w-4 h-4 text-primary-foreground" />}
+                  </div>
+                  <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground rounded-br-md"
+                      : "glass-card text-foreground rounded-bl-md"
+                  }`}>
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                </motion.div>
+              ))}
+
+              {isLoading && messages[messages.length - 1]?.role === "user" && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
+                  <div className="w-8 h-8 rounded-lg gradient-hero flex items-center justify-center shrink-0">
+                    <Bot className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                  <div className="glass-card rounded-2xl rounded-bl-md px-4 py-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Thinking...
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
-            <div className="glass-card rounded-2xl rounded-bl-md px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" /> Thinking...
+
+            {/* Quick Replies */}
+            {messages.length <= 1 && (
+              <div className="flex gap-2 px-4 pb-2 overflow-x-auto">
+                {quickReplies.map((q) => (
+                  <button
+                    key={q.label}
+                    onClick={() => sendMessage(q.label)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl glass-card text-xs text-foreground hover:bg-muted/50 transition-colors shrink-0"
+                  >
+                    <q.icon className="w-3 h-3 text-primary" />
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Input */}
+            <div className="p-4 border-t border-border">
+              <div className="flex gap-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  placeholder="Ask about crops, weather, prices..."
+                  className="flex-1 bg-muted rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 ring-primary/30"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
+                  disabled={isLoading}
+                />
+                <Button
+                  onClick={() => sendMessage(input)}
+                  disabled={isLoading || !input.trim()}
+                  className="gradient-hero text-primary-foreground border-0 hover:opacity-90 rounded-xl px-4"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           </motion.div>
         )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Replies */}
-      {messages.length <= 1 && (
-        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-          {quickReplies.map((q) => (
-            <button
-              key={q.label}
-              onClick={() => sendMessage(q.label)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl glass-card text-xs text-foreground hover:bg-muted/50 transition-colors shrink-0"
-            >
-              <q.icon className="w-3 h-3 text-primary" />
-              {q.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Input */}
-      <div className="flex gap-2">
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="Ask about crops, weather, prices..."
-          className="flex-1 bg-muted rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 ring-primary/30"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
-          disabled={isLoading}
-        />
-        <Button
-          onClick={() => sendMessage(input)}
-          disabled={isLoading || !input.trim()}
-          className="gradient-hero text-primary-foreground border-0 hover:opacity-90 rounded-xl px-4"
-        >
-          <Send className="w-4 h-4" />
-        </Button>
-      </div>
-    </div>
+      </AnimatePresence>
+    </>
   );
 }

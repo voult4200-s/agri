@@ -16,7 +16,7 @@ import BrandLogo from "@/components/BrandLogo";
 type AuthMode = "login" | "signup" | "forgot";
 
 export default function Auth() {
-  const { isAuthenticated, signIn, signUp } = useAuth();
+  const { isAuthenticated, signIn, signUp, resetPassword } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [mode, setMode] = useState<AuthMode>("login");
@@ -84,18 +84,32 @@ export default function Auth() {
       return;
     }
     setLoading(true);
-    const result = await signUp(signupEmail, signupPassword, fullName);
+    const result = await signUp(signupEmail, signupPassword, fullName, {
+      mobile: signupPhone || undefined,
+      state: state || undefined,
+      district: district || undefined,
+      village: village || undefined,
+      pin_code: pinCode || undefined,
+      farm_size: farmSize ? Number(farmSize) : null,
+    });
     setLoading(false);
     if (result.error) {
       toast({ title: "Signup Failed", description: result.error, variant: "destructive" });
     } else {
-      toast({ title: "Account created!", description: "Welcome to KrishiGrowAI!" });
+      toast({ title: "Account created!", description: result.message || "Welcome to KrishiGrowAI!" });
     }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({ title: "Reset link sent!", description: "Check your email for the password reset link. (Prototype: just use demo@krishigrow.ai / demo1234)" });
+    setLoading(true);
+    const result = await resetPassword(forgotEmail);
+    setLoading(false);
+    if (result.error) {
+      toast({ title: "Reset failed", description: result.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Reset link sent!", description: "Please check your email inbox." });
     setMode("login");
   };
 
@@ -123,9 +137,8 @@ export default function Auth() {
           </p>
           {/* Demo credentials hint */}
           <div className="mt-6 bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10">
-            <p className="text-sm font-medium mb-1">🔑 Demo Credentials</p>
-            <p className="text-xs text-primary-foreground/70">Email: demo@krishigrow.ai</p>
-            <p className="text-xs text-primary-foreground/70">Password: demo1234</p>
+            <p className="text-sm font-medium mb-1">Secure Authentication</p>
+            <p className="text-xs text-primary-foreground/70">Signup and login are now connected to Supabase Auth.</p>
           </div>
         </div>
 
@@ -151,7 +164,7 @@ export default function Auth() {
 
           {/* Mobile demo hint */}
           <div className="lg:hidden mb-6 bg-muted rounded-xl p-3 text-center">
-            <p className="text-xs text-muted-foreground">🔑 Demo: demo@krishigrow.ai / demo1234</p>
+            <p className="text-xs text-muted-foreground">Use your registered email and password to sign in.</p>
           </div>
 
           <AnimatePresence mode="wait">

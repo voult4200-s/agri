@@ -3,7 +3,7 @@ import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Wheat, Bot, CloudSun, TrendingUp, ShoppingCart,
-  Warehouse, Handshake, MessageCircle, Users, BookOpen, Receipt,
+  Warehouse, Handshake, MessageCircle, Users, BookOpen, Receipt, Briefcase,
   Settings, Bell, Search, ChevronLeft, ChevronRight, LogOut, Menu, X,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -18,6 +18,7 @@ const menuItems = [
   { icon: ShoppingCart, label: "Marketplace", path: "/dashboard/shop" },
   { icon: Warehouse, label: "Storage", path: "/dashboard/storage" },
   { icon: Handshake, label: "Farmer-to-Market", path: "/dashboard/sell" },
+  { icon: Briefcase, label: "Expert Consultancy", path: "/dashboard/experts" },
   { icon: MessageCircle, label: "AI Chatbot", path: "/dashboard/chat" },
   { icon: Users, label: "Community", path: "/dashboard/community" },
   { icon: BookOpen, label: "Knowledge Base", path: "/dashboard/learn" },

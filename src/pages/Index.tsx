@@ -6,6 +6,7 @@ import MarketplacePreview from "@/components/MarketplacePreview";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import CTASection from "@/components/CTASection";
 import Footer from "@/components/Footer";
+import FloatingChatbot from "@/components/FloatingChatbot";
 
 const Index = () => {
   return (
@@ -18,6 +19,7 @@ const Index = () => {
       <TestimonialsSection />
       <CTASection />
       <Footer />
+      <FloatingChatbot />
     </div>
   );
 };

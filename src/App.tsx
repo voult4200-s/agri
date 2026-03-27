@@ -22,6 +22,7 @@ import Settings from "./pages/Settings";
 import FarmerToMarket from "./pages/FarmerToMarket";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import MyFarms from "./pages/MyFarms";
+import ExpertConsultancy from "./pages/ExpertConsultancy";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +62,7 @@ function AnimatedRoutes() {
           <Route path="chat" element={<PageWrapper><Chatbot /></PageWrapper>} />
           <Route path="community" element={<PageWrapper><Community /></PageWrapper>} />
           <Route path="learn" element={<PageWrapper><KnowledgeBase /></PageWrapper>} />
+          <Route path="experts" element={<PageWrapper><ExpertConsultancy /></PageWrapper>} />
           <Route path="orders" element={<PageWrapper><Orders /></PageWrapper>} />
           <Route path="settings" element={<PageWrapper><Settings /></PageWrapper>} />
         </Route>
