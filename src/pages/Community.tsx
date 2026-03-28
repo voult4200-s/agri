@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Users, MessageSquare, ThumbsUp, Share2, Search, Plus, X,
+  Users, MessageSquare, ThumbsUp, Share2, Search, Plus, X, Copy, Check,
   TrendingUp, Leaf, Bug, CloudSun, Tractor, HelpCircle, Filter,
-  Heart, MessageCircle, Eye, Clock, ChevronDown, LogIn, Edit2, Trash2,
+  Heart, MessageCircle, Eye, Clock, ChevronDown, LogIn, Edit2, Trash2, Bookmark, Share,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const categories = [
   { id: "all", label: "All Topics", icon: Users },
@@ -29,6 +30,17 @@ const categories = [
   { id: "market", label: "Market Trends", icon: TrendingUp },
   { id: "help", label: "Ask for Help", icon: HelpCircle },
 ];
+
+interface Comment {
+  id: string;
+  author: string;
+  avatar: string;
+  content: string;
+  created_at: string;
+  likes_count: number;
+  user_id: string;
+  liked_by_user: boolean;
+}
 
 interface Post {
   id: string;
@@ -46,22 +58,14 @@ interface Post {
   created_at: string;
   tags: string[];
   liked_by_user: boolean;
-}
-
-interface Comment {
-  id: string;
-  author: string;
-  avatar: string;
-  content: string;
-  created_at: string;
-  likes_count: number;
-  user_id: string;
+  bookmarked_by_user: boolean;
 }
 
 export default function Community() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -70,6 +74,7 @@ export default function Community() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [sortBy, setSortBy] = useState("recent");
+  const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
 
   // New post form
   const [newTitle, setNewTitle] = useState("");
@@ -83,9 +88,9 @@ export default function Community() {
   const [editCategory, setEditCategory] = useState("");
   const [editTags, setEditTags] = useState("");
 
-  // Fetch posts from Supabase
+  // Fetch posts from Supabase with comments and like status
   const { data: posts = [], isLoading } = useQuery({
-    queryKey: ["communityPosts"],
+    queryKey: ["communityPosts", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("community_posts")
@@ -94,11 +99,9 @@ export default function Community() {
         .limit(100);
 
       if (error) throw error;
-
-      // If no data, return empty (will show "No posts" message)
       if (!data) return [];
 
-      // Fetch user full names separately
+      // Fetch user full names
       const userIds = Array.from(new Set((data as any[]).map((p) => p.user_id)));
       const { data: profilesData } = await supabase
         .from("profiles")
@@ -107,45 +110,105 @@ export default function Community() {
 
       const profileMap = new Map(profilesData?.map((p: any) => [p.user_id, p.full_name]) || []);
 
-      return (data as any[]).map((post) => {
-        const fullName = profileMap.get(post.user_id) || "Farmer";
-        return {
-          id: post.id,
-          user_id: post.user_id,
-          author: fullName,
-          avatar: fullName[0].toUpperCase(),
-          category: post.category,
-          title: post.title,
-          content: post.content,
-          likes_count: post.likes_count || 0,
-          comments: [],
-          views_count: post.views_count || 0,
-          created_at: post.created_at,
-          tags: post.tags || [],
-          liked_by_user: false,
-        };
-      });
+      // Fetch comments for each post
+      const postsWithComments: Post[] = await Promise.all(
+        (data as any[]).map(async (post) => {
+          // Fetch comments
+          const { data: commentsData } = await supabase
+            .from("community_comments")
+            .select("id, user_id, content, likes_count, created_at")
+            .eq("post_id", post.id)
+            .order("created_at", { ascending: true });
+
+          // Fetch comment authors
+          let comments: Comment[] = [];
+          if (commentsData && commentsData.length > 0) {
+            const commentUserIds = Array.from(new Set(commentsData.map((c: any) => c.user_id)));
+            const { data: commentProfiles } = await supabase
+              .from("profiles")
+              .select("user_id, full_name")
+              .in("user_id", commentUserIds);
+
+            const commentProfileMap = new Map(
+              commentProfiles?.map((p: any) => [p.user_id, p.full_name]) || []
+            );
+
+            // Fetch comment likes by current user
+            let commentLikeMap = new Map();
+            if (isAuthenticated && user) {
+              const { data: commentLikes } = await supabase
+                .from("community_comment_likes")
+                .select("comment_id")
+                .eq("user_id", user.id)
+                .in("comment_id", commentsData.map((c: any) => c.id));
+
+              commentLikeMap = new Map(commentLikes?.map((cl: any) => [cl.comment_id, true]) || []);
+            }
+
+            comments = commentsData.map((comment: any) => ({
+              id: comment.id,
+              author: commentProfileMap.get(comment.user_id) || "Farmer",
+              avatar: (commentProfileMap.get(comment.user_id) || "F")[0].toUpperCase(),
+              content: comment.content,
+              created_at: comment.created_at,
+              likes_count: comment.likes_count || 0,
+              user_id: comment.user_id,
+              liked_by_user: !!commentLikeMap.get(comment.id),
+            }));
+          }
+
+          // Check if current user liked this post
+          let liked_by_user = false;
+          if (isAuthenticated && user) {
+            const { data: userLike } = await supabase
+              .from("community_post_likes")
+              .select("id")
+              .eq("post_id", post.id)
+              .eq("user_id", user.id)
+              .maybeSingle();
+
+            liked_by_user = !!userLike;
+          }
+
+          const fullName = profileMap.get(post.user_id) || "Farmer";
+          return {
+            id: post.id,
+            user_id: post.user_id,
+            author: fullName,
+            avatar: fullName[0].toUpperCase(),
+            category: post.category,
+            title: post.title,
+            content: post.content,
+            likes_count: post.likes_count || 0,
+            comments,
+            views_count: post.views_count || 0,
+            created_at: post.created_at,
+            tags: post.tags || [],
+            liked_by_user,
+            bookmarked_by_user: false, // TODO: Implement bookmarks
+          };
+        })
+      );
+
+      return postsWithComments;
     },
+    enabled: true,
   });
 
   // Create post mutation
   const createPostMutation = useMutation({
     mutationFn: async (data: { title: string; content: string; category: string; tags: string[] }) => {
-      const { data: post, error } = await supabase
-        .from("community_posts")
-        .insert([
-          {
-            user_id: user?.id,
-            title: data.title,
-            content: data.content,
-            category: data.category,
-            tags: data.tags,
-          },
-        ])
-        .select();
+      const { error } = await supabase.from("community_posts").insert([
+        {
+          user_id: user?.id,
+          title: data.title,
+          content: data.content,
+          category: data.category,
+          tags: data.tags,
+        },
+      ]);
 
       if (error) throw error;
-      return post;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["communityPosts"] });
@@ -154,41 +217,47 @@ export default function Community() {
       setNewCategory("");
       setNewTags("");
       setShowCreateDialog(false);
+      toast({ title: "Success", description: "Post created successfully!" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Increment view count
+  const incrementViewMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const { error } = await supabase.rpc("increment_post_views", { post_id: postId });
+      if (error) throw error;
+    },
+    onError: () => {
+      // Silently fail - not critical
     },
   });
 
   // Like post mutation
   const likePostMutation = useMutation({
     mutationFn: async (postId: string) => {
-      const { error: checkError } = await supabase
-        .from("community_post_likes")
-        .select()
-        .eq("post_id", postId)
-        .eq("user_id", user?.id)
-        .maybeSingle();
-
-      if (checkError) throw checkError;
-
-      // For simplicity, we'll just toggle the like count
       const post = posts.find((p) => p.id === postId);
-      const isLiked = post?.liked_by_user;
+      if (!post) throw new Error("Post not found");
 
-      if (isLiked) {
-        const { error } = await supabase
+      if (post.liked_by_user) {
+        await supabase
           .from("community_post_likes")
           .delete()
           .eq("post_id", postId)
           .eq("user_id", user?.id);
-        if (error) throw error;
       } else {
-        const { error } = await supabase
+        await supabase
           .from("community_post_likes")
           .insert([{ post_id: postId, user_id: user?.id }]);
-        if (error) throw error;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["communityPosts"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -210,6 +279,7 @@ export default function Community() {
     onSuccess: () => {
       setNewComment("");
       queryClient.invalidateQueries({ queryKey: ["communityPosts"] });
+      toast({ title: "Success", description: "Comment added!" });
     },
   });
 
@@ -232,6 +302,7 @@ export default function Community() {
       queryClient.invalidateQueries({ queryKey: ["communityPosts"] });
       setShowEditDialog(false);
       setSelectedPost(null);
+      toast({ title: "Success", description: "Post updated!" });
     },
   });
 
@@ -248,6 +319,30 @@ export default function Community() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["communityPosts"] });
       setSelectedPost(null);
+      toast({ title: "Success", description: "Post deleted!" });
+    },
+  });
+
+  // Like comment mutation
+  const likeCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const comment = selectedPost?.comments.find((c) => c.id === commentId);
+      if (!comment) throw new Error("Comment not found");
+
+      if (comment.liked_by_user) {
+        await supabase
+          .from("community_comment_likes")
+          .delete()
+          .eq("comment_id", commentId)
+          .eq("user_id", user?.id);
+      } else {
+        await supabase
+          .from("community_comment_likes")
+          .insert([{ comment_id: commentId, user_id: user?.id }]);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["communityPosts"] });
     },
   });
 
@@ -270,7 +365,10 @@ export default function Community() {
       navigate("/auth");
       return;
     }
-    if (!newTitle.trim() || !newContent.trim() || !newCategory) return;
+    if (!newTitle.trim() || !newContent.trim() || !newCategory) {
+      toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
+      return;
+    }
     createPostMutation.mutate({
       title: newTitle,
       content: newContent,
@@ -297,6 +395,11 @@ export default function Community() {
       return;
     }
     likePostMutation.mutate(postId);
+  };
+
+  const handleOpenPost = (post: Post) => {
+    setSelectedPost(post);
+    incrementViewMutation.mutate(post.id);
   };
 
   const handleOpenEdit = () => {
@@ -326,16 +429,39 @@ export default function Community() {
     }
   };
 
+  const handleSharePost = (post: Post) => {
+    const message = `Check out this post: "${post.title}" on Agri Companion`;
+    const url = `${window.location.origin}/community`;
+
+    if (navigator.share) {
+      navigator.share({ title: "Agri Companion", text: message, url });
+    } else {
+      const shareUrl = `${url}?post=${post.id}`;
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedPostId(post.id);
+      setTimeout(() => setCopiedPostId(null), 2000);
+      toast({ title: "Link copied", description: "Post link copied to clipboard!" });
+    }
+  };
+
+  const handleLikeComment = (commentId: string) => {
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+    likeCommentMutation.mutate(commentId);
+  };
+
   const getCategoryColor = (cat: string) => {
     const map: Record<string, string> = {
-      crops: "bg-success/15 text-success border-success/20",
-      pests: "bg-destructive/15 text-destructive border-destructive/20",
-      weather: "bg-info/15 text-info border-info/20",
-      equipment: "bg-commerce/15 text-commerce border-commerce/20",
-      market: "bg-warning/15 text-warning border-warning/20",
-      help: "bg-accent/15 text-accent-foreground border-accent/20",
+      crops: "bg-emerald-500/15 text-emerald-700 border-emerald-200 dark:text-emerald-400",
+      pests: "bg-red-500/15 text-red-700 border-red-200 dark:text-red-400",
+      weather: "bg-blue-500/15 text-blue-700 border-blue-200 dark:text-blue-400",
+      equipment: "bg-amber-500/15 text-amber-700 border-amber-200 dark:text-amber-400",
+      market: "bg-violet-500/15 text-violet-700 border-violet-200 dark:text-violet-400",
+      help: "bg-pink-500/15 text-pink-700 border-pink-200 dark:text-pink-400",
     };
-    return map[cat] || "bg-muted text-muted-foreground border-border";
+    return map[cat] || "bg-gray-500/15 text-gray-700 border-gray-200";
   };
 
   const getTimeAgo = (date: string) => {
@@ -355,8 +481,8 @@ export default function Community() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Community Forum</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-3xl font-heading font-bold text-foreground">Community Forum</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             {isAuthenticated
               ? "Connect, share, and learn from fellow farmers"
               : "Sign in to join the conversation"}
@@ -365,41 +491,64 @@ export default function Community() {
         {isAuthenticated ? (
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button className="gradient-warm text-secondary-foreground border-0 hover:opacity-90 gap-2">
+              <Button className="gradient-warm text-secondary-foreground border-0 hover:opacity-90 gap-2 h-10">
                 <Plus className="w-4 h-4" /> New Post
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle className="font-heading">Create a Post</DialogTitle>
+                <DialogTitle className="font-heading text-xl">Share Your Knowledge</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <Input placeholder="Post title..." value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-                <Select value={newCategory} onValueChange={setNewCategory}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories
-                      .filter((c) => c.id !== "all")
-                      .map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <Textarea
-                  placeholder="Share your thoughts, questions, or tips..."
-                  rows={5}
-                  value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
-                />
-                <Input placeholder="Tags (comma-separated)" value={newTags} onChange={(e) => setNewTags(e.target.value)} />
+              <div className="space-y-4 pt-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Post Title</label>
+                  <Input
+                    placeholder="What's on your mind?"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="border-2"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Category</label>
+                  <Select value={newCategory} onValueChange={setNewCategory}>
+                    <SelectTrigger className="border-2">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories
+                        .filter((c) => c.id !== "all")
+                        .map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.label}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Description</label>
+                  <Textarea
+                    placeholder="Share your experience, tips, or ask a question..."
+                    rows={5}
+                    value={newContent}
+                    onChange={(e) => setNewContent(e.target.value)}
+                    className="border-2"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Tags (comma-separated)</label>
+                  <Input
+                    placeholder="e.g., wheat, organic, rabi"
+                    value={newTags}
+                    onChange={(e) => setNewTags(e.target.value)}
+                    className="border-2"
+                  />
+                </div>
                 <Button
                   onClick={handleCreatePost}
                   disabled={createPostMutation.isPending}
-                  className="w-full gradient-warm text-secondary-foreground border-0"
+                  className="w-full gradient-warm text-secondary-foreground border-0 h-10"
                 >
                   {createPostMutation.isPending ? "Publishing..." : "Publish Post"}
                 </Button>
@@ -407,7 +556,10 @@ export default function Community() {
             </DialogContent>
           </Dialog>
         ) : (
-          <Button onClick={() => navigate("/auth")} className="gradient-warm text-secondary-foreground border-0 gap-2">
+          <Button
+            onClick={() => navigate("/auth")}
+            className="gradient-warm text-secondary-foreground border-0 gap-2 h-10"
+          >
             <LogIn className="w-4 h-4" /> Sign In to Post
           </Button>
         )}
@@ -418,14 +570,14 @@ export default function Community() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search posts, tags..."
-            className="pl-9"
+            placeholder="Search posts and tags..."
+            className="pl-9 border-2"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-44 border-2">
             <Filter className="w-4 h-4 mr-2" />
             <SelectValue />
           </SelectTrigger>
@@ -438,32 +590,32 @@ export default function Community() {
       </div>
 
       {/* Category Pills */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {categories.map((cat) => (
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
               activeCategory === cat.id
-                ? "bg-primary text-primary-foreground shadow-md"
+                ? "bg-primary text-primary-foreground shadow-md scale-105"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
           >
-            <cat.icon className="w-3.5 h-3.5" />
+            <cat.icon className="w-4 h-4" />
             {cat.label}
           </button>
         ))}
       </div>
 
-      {/* Posts */}
+      {/* Posts Grid */}
       <div className="grid gap-4">
         {isLoading ? (
           <div className="text-center py-16 text-muted-foreground">
             <div className="w-12 h-12 rounded-full gradient-hero animate-spin border-4 border-transparent border-t-primary mx-auto mb-3" />
-            <p className="font-medium">Loading posts...</p>
+            <p className="font-medium">Loading community posts...</p>
           </div>
         ) : (
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence>
             {filteredPosts.map((post) => (
               <motion.div
                 key={post.id}
@@ -471,49 +623,54 @@ export default function Community() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-card border border-border rounded-xl p-5 hover:shadow-[var(--shadow-card)] transition-shadow cursor-pointer"
-                onClick={() => setSelectedPost(post)}
+                className="bg-card border-2 border-border rounded-xl p-6 hover:shadow-lg transition-all hover:scale-[1.01] cursor-pointer"
+                onClick={() => handleOpenPost(post)}
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-heading font-bold text-xs shrink-0">
+                  <div className="w-12 h-12 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-heading font-bold text-sm shrink-0">
                     {post.avatar}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="font-medium text-sm text-foreground">{post.author}</span>
-                      <span className="text-xs text-muted-foreground">· {getTimeAgo(post.created_at)}</span>
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <span className="font-semibold text-sm text-foreground">{post.author}</span>
+                      <span className="text-xs text-muted-foreground">·</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {getTimeAgo(post.created_at)}
+                      </span>
                     </div>
-                    <h3 className="font-heading font-semibold text-foreground mb-2 line-clamp-1">{post.title}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{post.content}</p>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Badge variant="outline" className={getCategoryColor(post.category)}>
+                    <h3 className="font-heading font-bold text-lg text-foreground mb-2 line-clamp-2">
+                      {post.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
+                      {post.content}
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap mb-4">
+                      <Badge className={`${getCategoryColor(post.category)} border`}>
                         {categories.find((c) => c.id === post.category)?.label}
                       </Badge>
                       {post.tags.slice(0, 3).map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full"
-                        >
+                        <span key={tag} className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full font-medium">
                           #{tag}
                         </span>
                       ))}
                     </div>
-                    <div className="flex items-center gap-5 mt-3 text-muted-foreground">
+                    <div className="flex items-center gap-6 text-muted-foreground">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleLike(post.id);
                         }}
-                        className={`flex items-center gap-1.5 text-xs hover:text-destructive transition-colors ${
-                          post.liked_by_user ? "text-destructive" : ""
+                        className={`flex items-center gap-1.5 text-sm font-medium transition-all hover:scale-110 ${
+                          post.liked_by_user ? "text-red-500" : "hover:text-red-500"
                         }`}
                       >
-                        <Heart className={`w-4 h-4 ${post.liked_by_user ? "fill-current" : ""}`} /> {post.likes_count}
+                        <Heart className={`w-4 h-4 ${post.liked_by_user ? "fill-current" : ""}`} />
+                        {post.likes_count}
                       </button>
-                      <span className="flex items-center gap-1.5 text-xs">
+                      <span className="flex items-center gap-1.5 text-sm font-medium">
                         <MessageCircle className="w-4 h-4" /> {post.comments.length}
                       </span>
-                      <span className="flex items-center gap-1.5 text-xs">
+                      <span className="flex items-center gap-1.5 text-sm font-medium">
                         <Eye className="w-4 h-4" /> {post.views_count}
                       </span>
                     </div>
@@ -526,11 +683,11 @@ export default function Community() {
 
         {!isLoading && filteredPosts.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
-            <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">No posts found</p>
-            <p className="text-sm">
+            <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-30" />
+            <p className="font-semibold text-lg">No posts found</p>
+            <p className="text-sm mt-2">
               {isAuthenticated
-                ? "Try a different category or search term"
+                ? "Be the first to post in this category!"
                 : "Sign in to start posting and joining discussions"}
             </p>
           </div>
@@ -539,91 +696,125 @@ export default function Community() {
 
       {/* Post Detail Dialog */}
       <Dialog open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedPost && (
             <>
-              <DialogHeader>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-heading font-bold text-xs">
-                    {selectedPost.avatar}
+              <DialogHeader className="border-b pb-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1">
+                    <div className="w-11 h-11 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-heading font-bold text-sm shrink-0">
+                      {selectedPost.avatar}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">{selectedPost.author}</p>
+                      <p className="text-xs text-muted-foreground">{getTimeAgo(selectedPost.created_at)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-sm">{selectedPost.author}</p>
-                    <p className="text-xs text-muted-foreground">{getTimeAgo(selectedPost.created_at)}</p>
-                  </div>
+                  {user?.id === selectedPost.user_id && (
+                    <div className="flex gap-1">
+                      <Button
+                        onClick={handleOpenEdit}
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        onClick={handleDeletePost}
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <DialogTitle className="font-heading text-lg">{selectedPost.title}</DialogTitle>
+                <DialogTitle className="font-heading text-xl mt-4">{selectedPost.title}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{selectedPost.content}</p>
+
+              <div className="space-y-5">
+                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {selectedPost.content}
+                </p>
+
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className={getCategoryColor(selectedPost.category)}>
+                  <Badge className={`${getCategoryColor(selectedPost.category)} border`}>
                     {categories.find((c) => c.id === selectedPost.category)?.label}
                   </Badge>
                   {selectedPost.tags.map((tag) => (
-                    <span key={tag} className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    <span key={tag} className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
                       #{tag}
                     </span>
                   ))}
                 </div>
-                <div className="flex items-center gap-5 text-muted-foreground border-y border-border py-3">
+
+                <div className="flex items-center gap-6 text-muted-foreground border-y border-border py-4">
                   <button
                     onClick={() => handleLike(selectedPost.id)}
-                    className={`flex items-center gap-1.5 text-sm hover:text-destructive transition-colors ${
-                      selectedPost.liked_by_user ? "text-destructive" : ""
+                    className={`flex items-center gap-2 text-sm font-medium transition-all ${
+                      selectedPost.liked_by_user ? "text-red-500" : "hover:text-red-500"
                     }`}
                   >
-                    <Heart className={`w-4 h-4 ${selectedPost.liked_by_user ? "fill-current" : ""}`} />{" "}
+                    <Heart className={`w-4 h-4 ${selectedPost.liked_by_user ? "fill-current" : ""}`} />
                     {selectedPost.likes_count} Likes
                   </button>
-                  <span className="flex items-center gap-1.5 text-sm">
+                  <span className="flex items-center gap-2 text-sm font-medium">
                     <Eye className="w-4 h-4" /> {selectedPost.views_count} Views
                   </span>
-                  {user?.id === selectedPost.user_id && (
-                    <>
-                      <button
-                        onClick={handleOpenEdit}
-                        className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors ml-auto"
-                      >
-                        <Edit2 className="w-4 h-4" /> Edit
-                      </button>
-                      <button
-                        onClick={handleDeletePost}
-                        disabled={deletePostMutation.isPending}
-                        className="flex items-center gap-1.5 text-sm hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" /> Delete
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleSharePost(selectedPost)}
+                    className="flex items-center gap-2 text-sm font-medium hover:text-foreground ml-auto"
+                  >
+                    {copiedPostId === selectedPost.id ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-500" /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Share className="w-4 h-4" /> Share
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                {/* Comments */}
-                <div>
-                  <h4 className="font-heading font-semibold text-sm mb-3">Comments ({selectedPost.comments.length})</h4>
+                {/* Comments Section */}
+                <div className="space-y-4">
+                  <h4 className="font-heading font-semibold text-base">
+                    Comments ({selectedPost.comments.length})
+                  </h4>
+
                   {isAuthenticated ? (
-                    <div className="space-y-3">
-                      {selectedPost.comments.map((comment) => (
-                        <div key={comment.id} className="flex gap-3 bg-muted/50 rounded-lg p-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-heading font-bold text-[10px] shrink-0">
-                            {comment.avatar}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-xs">{comment.author}</span>
-                              <span className="text-[10px] text-muted-foreground">{getTimeAgo(comment.created_at)}</span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">{comment.content}</p>
-                            <button className="flex items-center gap-1 text-xs text-muted-foreground mt-1.5 hover:text-foreground">
-                              <ThumbsUp className="w-3 h-3" /> {comment.likes_count}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="flex gap-3 bg-muted/30 rounded-lg p-4">
+                      <div className="w-9 h-9 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-heading font-bold text-xs shrink-0 mt-1">
+                        {user?.email?.[0].toUpperCase() || "Y"}
+                      </div>
+                      <div className="flex-1 flex gap-2">
+                        <Textarea
+                          placeholder="Share your thoughts..."
+                          rows={3}
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          className="border-2 resize-none"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && e.ctrlKey) {
+                              handleAddComment();
+                            }
+                          }}
+                        />
+                        <Button
+                          onClick={handleAddComment}
+                          disabled={addCommentMutation.isPending || !newComment.trim()}
+                          className="self-end gradient-warm text-secondary-foreground border-0 h-10"
+                        >
+                          {addCommentMutation.isPending ? "..." : "Post"}
+                        </Button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="text-center py-6 text-muted-foreground border border-border rounded-lg">
-                      <p className="text-sm mb-3">Sign in to view and post comments</p>
+                    <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-3">Sign in to comment</p>
                       <Button
                         onClick={() => navigate("/auth")}
                         className="gradient-warm text-secondary-foreground border-0 gap-2"
@@ -632,33 +823,42 @@ export default function Community() {
                       </Button>
                     </div>
                   )}
-                </div>
 
-                {/* Add Comment */}
-                {isAuthenticated && (
-                  <div className="flex gap-2 pt-2">
-                    <Textarea
-                      placeholder="Write a reply..."
-                      rows={2}
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      className="flex-1"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleAddComment();
-                        }
-                      }}
-                    />
-                    <Button
-                      onClick={handleAddComment}
-                      disabled={addCommentMutation.isPending}
-                      className="self-end gradient-warm text-secondary-foreground border-0"
-                    >
-                      {addCommentMutation.isPending ? "..." : "Reply"}
-                    </Button>
+                  {/* Comments List */}
+                  <div className="space-y-3 mt-6">
+                    {selectedPost.comments.length === 0 ? (
+                      <p className="text-center text-sm text-muted-foreground py-6">
+                        No comments yet. Be the first to comment!
+                      </p>
+                    ) : (
+                      selectedPost.comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-3 bg-muted/30 rounded-lg p-4">
+                          <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-primary font-heading font-bold text-xs shrink-0 mt-1">
+                            {comment.avatar}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">{comment.author}</span>
+                              <span className="text-xs text-muted-foreground">{getTimeAgo(comment.created_at)}</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground leading-relaxed mb-2">{comment.content}</p>
+                            {isAuthenticated && (
+                              <button
+                                onClick={() => handleLikeComment(comment.id)}
+                                className={`flex items-center gap-1 text-xs font-medium transition-all ${
+                                  comment.liked_by_user ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+                                }`}
+                              >
+                                <Heart className={`w-3 h-3 ${comment.liked_by_user ? "fill-current" : ""}`} />
+                                {comment.likes_count}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </>
           )}
@@ -671,29 +871,49 @@ export default function Community() {
           <DialogHeader>
             <DialogTitle className="font-heading">Edit Post</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <Input placeholder="Post title..." value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-            <Select value={editCategory} onValueChange={setEditCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories
-                  .filter((c) => c.id !== "all")
-                  .map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.label}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <Textarea
-              placeholder="Share your thoughts, questions, or tips..."
-              rows={5}
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-            />
-            <Input placeholder="Tags (comma-separated)" value={editTags} onChange={(e) => setEditTags(e.target.value)} />
+          <div className="space-y-4 pt-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Title</label>
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="border-2"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Category</label>
+              <Select value={editCategory} onValueChange={setEditCategory}>
+                <SelectTrigger className="border-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories
+                    .filter((c) => c.id !== "all")
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Description</label>
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                rows={5}
+                className="border-2"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Tags</label>
+              <Input
+                value={editTags}
+                onChange={(e) => setEditTags(e.target.value)}
+                className="border-2"
+              />
+            </div>
             <div className="flex gap-2">
               <Button
                 onClick={handleSaveEdit}
@@ -702,11 +922,7 @@ export default function Community() {
               >
                 {editPostMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
-              <Button
-                onClick={() => setShowEditDialog(false)}
-                variant="outline"
-                className="flex-1"
-              >
+              <Button onClick={() => setShowEditDialog(false)} variant="outline" className="flex-1">
                 Cancel
               </Button>
             </div>
