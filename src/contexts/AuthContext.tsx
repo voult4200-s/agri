@@ -94,24 +94,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [getFallbackName]);
 
   const mapUser = useCallback(async (authUser: AuthUserLike) => {
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("user_id", authUser.id)
-      .maybeSingle();
+    // Try to get profile but with a VERY short timeout to avoid UI hangs
+    try {
+      const { data: profile, error } = await withTimeout(
+        supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", authUser.id)
+          .maybeSingle(),
+        2500 // Only wait 2.5s for profile data
+      );
 
-    if (error) {
+      if (error || !profile) {
+        return mapAuthUserFallback(authUser);
+      }
+
+      return {
+        id: authUser.id,
+        email: authUser.email || "",
+        full_name: profile?.full_name || getFallbackName(authUser),
+      } satisfies AppUser;
+    } catch {
+      // Fallback to internal metadata if DB query fails/times out
       return mapAuthUserFallback(authUser);
     }
-
-    return {
-      id: authUser.id,
-      email: authUser.email || "",
-      full_name:
-        profile?.full_name ||
-        getFallbackName(authUser),
-    } satisfies AppUser;
-  }, [getFallbackName, mapAuthUserFallback]);
+  }, [getFallbackName, mapAuthUserFallback, withTimeout]);
 
   useEffect(() => {
     let mounted = true;
@@ -276,8 +283,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+    try {
+      setLoading(true);
+      // Try with extreme short timeout, don't wait for server if it hang
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("SignOut Timeout")), 2000))
+      ]).catch(() => {
+        // Fallback: Clear session locally anyway if server is unreachable
+        localStorage.removeItem("supabase.auth.token");
+        sessionStorage.clear();
+      });
+      
+      setUser(null);
+    } catch (e) {
+      setUser(null);
+    } finally {
+      // Small delay to ensure state propagates, then redirect
+      setTimeout(() => {
+        setLoading(false);
+        window.location.href = "/auth";
+      }, 100);
+    }
   }, []);
 
   return (
