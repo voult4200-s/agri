@@ -1,239 +1,265 @@
 <div align="center">
 
+<a href="https://agri-companion.vercel.app/" target="_blank">
+  <img src="https://github.com/Snehasish-tech/Agri-Companion/assets/80269820/58320b1a-0553-425c-a1d2-8f4f1139c89d" alt="KrishiGrowAI Logo" width="120" />
+</a>
+
 # 🌾 KrishiGrowAI
 
-### *Smart Farming Platform Powered by Artificial Intelligence*
+### *AI-Powered Smart Farming for the Modern Indian Farmer*
 
 <br/>
 
-[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+<p>
+  <a href="https://agri-companion.vercel.app/" target="_blank">
+    <img src="https://img.shields.io/badge/Vercel-Live_Demo-black?style=for-the-badge&logo=vercel" alt="Live Demo" />
+  </a>
+  <a href="https://github.com/Snehasish-tech/Agri-Companion/blob/main/LICENSE" target="_blank">
+    <img src="https://img.shields.io/github/license/Snehasish-tech/Agri-Companion?style=for-the-badge&color=blue" alt="License" />
+  </a>
+  <a href="https://github.com/Snehasish-tech/Agri-Companion/stargazers" target="_blank">
+    <img src="https://img.shields.io/github/stars/Snehasish-tech/Agri-Companion?style=for-the-badge&color=yellow" alt="Stars" />
+  </a>
+</p>
 
-<br/>
+<p>
+  <img src="https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Vite-5.4-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
+  <img src="https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase">
+</p>
 
 > **KrishiGrowAI** is a next-generation smart farming companion that empowers Indian farmers with AI-driven crop advice, real-time market intelligence, direct buyer connections, and complete farm management — all in one platform.
 
 <br/>
 
-[🚀 Live Demo](#) &nbsp;|&nbsp; [📸 Screenshots](#-screenshots) &nbsp;|&nbsp; [⚙️ Setup](#-getting-started) &nbsp;|&nbsp; [🤝 Contributing](#-contributing)
+[🚀 Live Demo](https://agri-companion.vercel.app/) &nbsp;|&nbsp; [📸 Screenshots](#-screenshots) &nbsp;|&nbsp; [⚙️ Setup](#-getting-started) &nbsp;|&nbsp; [🤝 Contributing](#-contributing)
 
 ---
 
 </div>
 
-## ✨ Features
+## 🤔 Why KrishiGrowAI?
 
-| Feature | Description |
-|---|---|
-| 🤖 **AI Crop Advisor** | Personalized crop recommendations based on soil, climate & market |
-| 🌦️ **Weather Intelligence** | 7-day ag-specific forecasts with smart alerts |
-| 📈 **Market Analytics** | Real-time mandi prices & AI-powered price predictions |
-| 🛒 **E-Commerce Marketplace** | Buy seeds, fertilizers & farm equipment |
-| 🏭 **Storage Solutions** | Book cold storage & warehouses with quality monitoring |
-| 🤝 **Farmer-to-Market** | Sell directly to buyers — no middlemen |
-| 💬 **AI Chatbot** | Pest identification & instant expert advice |
-| 📚 **Knowledge Base** | Modern farming guides, videos & expert articles |
-| 💰 **Financial Tools** | ROI calculator, expense tracker & subsidy finder |
+Indian agriculture is the backbone of our nation, yet farmers face immense challenges: unpredictable weather, volatile market prices, soil degradation, and a lack of access to modern technology.
+
+**KrishiGrowAI** was built to bridge this gap. Our mission is to put the power of data and artificial intelligence directly into the hands of every farmer. We provide actionable insights and tools that help:
+
+-   ✅ **Increase Yields:** By recommending the right crop for the right soil and climate.
+-   ✅ **Boost Profits:** Through real-time market price tracking and direct-to-buyer sales.
+-   ✅ **Reduce Risks:** With accurate weather forecasts and timely pest alerts.
+-   ✅ **Promote Sustainability:** By encouraging modern, efficient farming practices.
+
+This platform is more than just an app; it's a commitment to a more prosperous and sustainable future for Indian agriculture.
+
+---
+
+## ✨ Core Features
+
+| Icon | Feature | Description |
+| :---: | --- | --- |
+| 🤖 | **AI Crop Advisor** | Personalized crop recommendations based on soil type, local climate, and market demand. |
+| 🌦️ | **Hyperlocal Weather** | 7-day agricultural forecasts with alerts for rain, frost, and extreme heat. |
+| 📈 | **Market Price Analytics** | Live *mandi* prices from across the country with AI-powered future price trend predictions. |
+| 🛒 | **E-Commerce Marketplace** | Buy certified seeds, fertilizers, and equipment directly from verified sellers. |
+| 🏭 | **Smart Storage Solutions** | Find and book nearby cold storage and warehouses with real-time quality monitoring. |
+| 🤝 | **Farmer-to-Market Connect** | A community-driven platform to sell produce directly to businesses and consumers, cutting out middlemen. |
+| 💬 | **AI Farming Assistant** | An intelligent chatbot for instant pest/disease identification, soil advice, and government scheme information. |
+| 📚 | **Digital Knowledge Base** | A rich library of modern farming guides, tutorial videos, and expert articles in multiple languages. |
+| 💰 | **Farm Finance Tools** | Easy-to-use ROI calculators, expense trackers, and a directory of available government subsidies. |
+| 👥 | **Community Forum** | A social hub for farmers to ask questions, share knowledge, and build a supportive network. |
 
 ---
 
 ## 📸 Screenshots
 
+*A picture is worth a thousand words. Here's a glimpse of KrishiGrowAI in action.*
+
 <div align="center">
 
-<img width="1917" height="909" alt="Screenshot 2026-03-07 203443" src="https://github.com/user-attachments/assets/8c07ded4-d57d-414e-b22c-6f6224160375" />
+<img width="1917" height="909" alt="KrishiGrowAI Dashboard" src="https://github.com/user-attachments/assets/8c07ded4-d57d-414e-b22c-6f6224160375" />
+*The main dashboard, providing a complete overview of your farm.*
+
+<!-- Add more screenshots here! -->
+<!-- e.g., <img src="path/to/market_prices.png" width="48%" alt="Market Prices"> -->
+<!-- e.g., <img src="path/to/community_forum.png" width="48%" alt="Community Forum"> -->
 
 </div>
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Tech Stack & Architecture
 
 ### Frontend
-- **React 18** + **TypeScript** — Component-based UI with type safety
-- **Vite 5** — Lightning-fast dev server & build tool
-- **Tailwind CSS 3** — Utility-first responsive styling
-- **Framer Motion** — Smooth animations & page transitions
-- **Three.js** + **@react-three/fiber** — Interactive 3D hero scene
-- **shadcn/ui** + **Radix UI** — Accessible, customizable components
-- **React Router v6** — Client-side routing
-- **TanStack Query** — Server state & data fetching
-- **Recharts** — Data visualization & charts
+- **Framework:** **React 18** with **TypeScript** for a robust, type-safe, and component-based architecture.
+- **Build Tool:** **Vite 5** provides a lightning-fast development server and optimized production builds.
+- **Styling:** **Tailwind CSS 3** for a utility-first, responsive design system.
+- **UI Components:** **shadcn/ui** & **Radix UI** for a library of accessible, themeable, and unstyled components.
+- **Animation:** **Framer Motion** for fluid animations and page transitions.
+- **3D Graphics:** **Three.js** & **@react-three/fiber** for the interactive 3D hero scene.
+- **Routing:** **React Router v6** for declarative client-side routing.
+- **Data Fetching:** **TanStack Query (React Query)** for efficient server state management, caching, and data synchronization.
+- **Data Visualization:** **Recharts** for creating beautiful and informative charts.
 
 ### Backend & Services
-- **Supabase** — PostgreSQL database, Auth & Edge Functions
-- **Row Level Security (RLS)** — Per-user data isolation
-- **Supabase Edge Functions** — AI chat integration (Deno runtime)
+- **Backend-as-a-Service (BaaS):** **Supabase** is used for its powerful suite of tools:
+  - **PostgreSQL Database:** A scalable, relational database for all application data.
+  - **Authentication:** Secure user management with email/password and social logins.
+  - **Row Level Security (RLS):** Fine-grained data access control, ensuring users only see their own data.
+  - **Edge Functions:** Serverless Deno functions for running backend logic, such as the AI chat integration.
 
 ### Developer Experience
-- **ESLint** + **TypeScript ESLint** — Code linting & quality
-- **Vitest** + **Testing Library** — Unit testing
-- **PostCSS** + **Autoprefixer** — CSS tooling
+- **Linting:** **ESLint** & **TypeScript ESLint** to enforce code quality and consistency.
+- **Testing:** **Vitest** & **React Testing Library** for fast and effective unit/integration testing.
+- **CSS Tooling:** **PostCSS** & **Autoprefixer** for modern CSS processing.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-krishigrowai/
+agri-companion/
 ├── public/
-│   ├── models/              # 3D GLB model files
-│   └── logo.jpg             # App favicon & branding
+│   ├── models/              # 3D GLB model files for the hero scene
+│   └── robots.txt           # SEO instructions for web crawlers
 ├── src/
-│   ├── assets/              # Images & static resources
-│   ├── components/          # Reusable UI components
-│   │   ├── ui/              # shadcn/ui primitives (50+ components)
-│   │   ├── BrandLogo.tsx    # KrishiGrowAI branded logo
-│   │   ├── HeroSection.tsx  # Landing hero with 3D scene
-│   │   ├── Hero3DScene.tsx  # Three.js 3D model viewer
-│   │   ├── FeaturesSection.tsx
-│   │   ├── HowItWorks.tsx
-│   │   ├── TestimonialsSection.tsx
-│   │   ├── Navbar.tsx
-│   │   └── DashboardLayout.tsx
-│   ├── contexts/            # React Context providers
-│   │   └── AuthContext.tsx
-│   ├── hooks/               # Custom React hooks
-│   ├── integrations/        # Supabase client & auto-generated types
-│   ├── lib/                 # Utility functions
-│   └── pages/               # Route-level page components
-│       ├── Index.tsx        # Landing page
-│       ├── Auth.tsx         # Login / Signup
-│       ├── DashboardHome.tsx
-│       ├── AIRecommendation.tsx
-│       ├── Marketplace.tsx
-│       ├── Weather.tsx
-│       ├── MarketPrices.tsx
-│       ├── Chatbot.tsx
-│       ├── Community.tsx
-│       ├── KnowledgeBase.tsx
-│       ├── FarmerToMarket.tsx
-│       ├── Storage.tsx
-│       ├── MyFarms.tsx
-│       ├── Orders.tsx
-│       └── Settings.tsx
+│   ├── assets/              # Static images, icons, and other resources
+│   ├── components/          # Reusable React components (e.g., Navbar, Footer)
+│   │   ├── ui/              # Core shadcn/ui primitives (Button, Card, etc.)
+│   │   └── ...
+│   ├── contexts/            # React Context for global state (e.g., AuthContext)
+│   ├── hooks/               # Custom React hooks for shared logic
+│   ├── integrations/        # Supabase client setup and auto-generated types
+│   ├── lib/                 # Utility functions (e.g., date formatting)
+│   └── pages/               # Top-level components for each route/page
+│       ├── Index.tsx        # The main landing page
+│       ├── Auth.tsx         # Login / Signup page
+│       └── ...              # All other feature pages
 ├── supabase/
-│   ├── config.toml
-│   ├── functions/           # Deno Edge Functions
-│   │   └── farming-chat/    # AI chatbot backend
-│   └── migrations/          # Database schema migrations
-└── ...config files
+│   ├── config.toml          # Supabase project configuration
+│   ├── functions/           # Deno Edge Functions (e.g., AI chatbot)
+│   └── migrations/          # Database schema changes and versioning
+└── ...                      # Root config files (vite, tsconfig, tailwind, etc.)
 ```
 
 ---
 
 ## 🚀 Getting Started
 
+Follow these steps to get a local copy of the project up and running.
+
 ### Prerequisites
 
-- **Node.js 18+** — [Download here](https://nodejs.org/)
-- **npm** (comes with Node.js)
-- A **Supabase** account — [Sign up free](https://supabase.com/)
+-   **Node.js:** Version 18.x or higher. [Download here](https://nodejs.org/).
+-   **npm:** Should be included with your Node.js installation.
+-   **Git:** For cloning the repository.
+-   A **Supabase** account: [Sign up for a free account](https://supabase.com/).
 
-### Installation
+### Installation & Setup
+
+1.  **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/Snehasish-tech/Agri-Companion.git
+    cd Agri-Companion
+    ```
+
+2.  **Install dependencies:**
+
+    ```bash
+    npm install
+    ```
+
+3.  **Set up your Supabase project:**
+    -   Go to your [Supabase Dashboard](https://supabase.com/dashboard) and create a new project.
+    -   Navigate to the **SQL Editor**.
+    -   Open each file in the `supabase/migrations/` directory of this repository, copy the SQL content, and run it in the Supabase SQL Editor. This will create all the necessary tables and policies.
+
+4.  **Configure Environment Variables:**
+    -   Create a new file named `.env` in the root of your project.
+    -   Go to your Supabase project's **Settings > API**.
+    -   Copy the **Project URL** and the **`anon` public key**.
+    -   Paste them into your `.env` file like this:
+
+    ```env
+    # Supabase Credentials
+    VITE_SUPABASE_URL="YOUR_PROJECT_URL"
+    VITE_SUPABASE_ANON_KEY="YOUR_ANON_PUBLIC_KEY"
+
+    # Other API Keys (Optional)
+    # VITE_GROQ_API_KEY="your_groq_api_key"
+    # VITE_OPENWEATHERMAP_API_KEY="your_openweathermap_api_key"
+    ```
+
+### Running the Application
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/krishigrowai.git
-cd krishigrowai
-
-# 2. Install dependencies
-npm install
-
-# 3. Configure environment variables
-# Create a .env file in the root directory:
-```
-
-### Environment Variables
-
-Create a `.env` file in the root:
-
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_or_anon_key
-# Optional backward compatibility (you can keep either one):
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# Chatbot (optional fallback if Supabase Edge Function is unavailable)
-VITE_GROQ_API_KEY=your_groq_api_key
-VITE_GROQ_MODEL=llama-3.3-70b-versatile
-
-# Weather
-VITE_OPENWEATHERMAP_API_KEY=your_openweathermap_api_key
-```
-
-> Get these from: Supabase Dashboard → Your Project → Settings → API
-
-### Run Locally
-
-```bash
-# Start development server
+# Start the development server (usually on http://localhost:5173)
 npm run dev
-# → Opens at http://localhost:8080
 
-# Run tests
+# Run unit tests
 npm run test
 
-# Type-check
-npx tsc --noEmit
-
-# Production build
+# Check for TypeScript errors
 npm run build
 
-# Preview production build
+# Build the application for production
+npm run build
+
+# Preview the production build locally
 npm run preview
 ```
 
 ---
 
+## ☁️ Deployment
+
+This project is optimized for deployment on **Vercel**.
+
+1.  **Push your code to a GitHub repository.**
+2.  **Import your project on Vercel.** Vercel will automatically detect that it's a Vite project.
+3.  **Add your environment variables** (`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`) in the Vercel project settings.
+4.  **Deploy!** Vercel will automatically build and deploy your site. Any subsequent pushes to your main branch will trigger new deployments.
+
+---
+
 ## 🗺️ Roadmap
 
-- [x] AI Crop Recommendation engine
-- [x] Weather intelligence dashboard
-- [x] Direct farmer-to-buyer marketplace
-- [x] Cold storage booking system
-- [x] AI chatbot with pest identification
-- [x] Community forum
-- [x] Knowledge base with articles
-- [x] Financial tools & ROI calculator
-- [ ] 📱 Mobile app (React Native)
-- [ ] 🌐 Multilingual support (Hindi, Bengali, Tamil, Telugu)
-- [ ] 📶 Offline-first PWA mode
-- [ ] 🛰️ Satellite imagery integration
-- [ ] 📡 IoT sensor dashboard
-- [ ] 🏦 Microfinance & loan marketplace
+- [x] AI Crop Recommendation Engine
+- [x] Weather Intelligence Dashboard
+- [x] Direct Farmer-to-Buyer Marketplace
+- [x] Cold Storage Booking System
+- [x] AI Chatbot with Pest Identification
+- [x] Community Forum with Posts, Comments & Likes
+- [x] Knowledge Base with Articles
+- [x] Farm Financial Tools & ROI Calculator
+- [ ] 📱 **Mobile App:** Develop a cross-platform mobile app using React Native.
+- [ ] 🌐 **Multilingual Support:** Add support for major Indian languages (Hindi, Bengali, Tamil, Telugu).
+- [ ] 📶 **Offline-First Mode:** Implement Progressive Web App (PWA) capabilities for offline access.
+- [ ] 🛰️ **Satellite Imagery:** Integrate satellite data for crop health monitoring.
+- [ ] 📡 **IoT Sensor Dashboard:** Allow farmers to connect and monitor on-field IoT devices.
+- [ ] 🏦 **Microfinance Integration:** Partner with financial institutions to offer microloans.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome!
+Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-```bash
-# 1. Fork the project on GitHub
+1.  **Fork the Project** on GitHub.
+2.  **Create your Feature Branch** (`git checkout -b feature/AmazingFeature`).
+3.  **Commit your Changes** (`git commit -m 'feat: Add some AmazingFeature'`).
+4.  **Push to the Branch** (`git push origin feature/AmazingFeature`).
+5.  **Open a Pull Request**.
 
-# 2. Create your feature branch
-git checkout -b feature/AmazingFeature
-
-# 3. Make your changes & commit
-git add .
-git commit -m "feat: add AmazingFeature"
-
-# 4. Push to your branch
-git push origin feature/AmazingFeature
-
-# 5. Open a Pull Request on GitHub
-```
-
-**Commit message format:**
-- `feat:` — New feature
-- `fix:` — Bug fix
-- `style:` — UI/styling changes
-- `docs:` — Documentation updates
-- `refactor:` — Code refactoring
+Please adhere to the following commit message format:
+- `feat:` A new feature
+- `fix:` A bug fix
+- `style:` UI, styling, or formatting changes
+- `docs:` Documentation updates
+- `refactor:` Code refactoring without changing functionality
+- `chore:` Build process or auxiliary tool changes
 
 ---
 
@@ -246,7 +272,7 @@ See the [LICENSE](LICENSE) file for full details.
 
 ## 👩‍💻 Author
 
-**Snehasish** — Building technology for the farmers of India 🇮🇳
+**Snehasish Dey** — *Building technology for the farmers of India 🇮🇳*
 
 <div align="center">
 
@@ -263,3 +289,4 @@ See the [LICENSE](LICENSE) file for full details.
 Made with ❤️ for all Indian Farmers
 
 </div>
+
