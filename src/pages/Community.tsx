@@ -82,10 +82,7 @@ export default function Community() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("community_posts")
-        .select(`
-          id, user_id, title, content, category, tags, likes_count, views_count, created_at,
-          profiles(full_name)
-        `)
+        .select("id, user_id, title, content, category, tags, likes_count, views_count, created_at")
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -94,21 +91,33 @@ export default function Community() {
       // If no data, return empty (will show "No posts" message)
       if (!data) return [];
 
-      return (data as any[]).map((post) => ({
-        id: post.id,
-        user_id: post.user_id,
-        author: post.profiles?.full_name || "Anonymous",
-        avatar: (post.profiles?.full_name || "A")[0].toUpperCase(),
-        category: post.category,
-        title: post.title,
-        content: post.content,
-        likes_count: post.likes_count || 0,
-        comments: [],
-        views_count: post.views_count || 0,
-        created_at: post.created_at,
-        tags: post.tags || [],
-        liked_by_user: false,
-      }));
+      // Fetch user full names separately
+      const userIds = Array.from(new Set((data as any[]).map((p) => p.user_id)));
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", userIds);
+
+      const profileMap = new Map(profilesData?.map((p: any) => [p.user_id, p.full_name]) || []);
+
+      return (data as any[]).map((post) => {
+        const fullName = profileMap.get(post.user_id) || "Farmer";
+        return {
+          id: post.id,
+          user_id: post.user_id,
+          author: fullName,
+          avatar: fullName[0].toUpperCase(),
+          category: post.category,
+          title: post.title,
+          content: post.content,
+          likes_count: post.likes_count || 0,
+          comments: [],
+          views_count: post.views_count || 0,
+          created_at: post.created_at,
+          tags: post.tags || [],
+          liked_by_user: false,
+        };
+      });
     },
   });
 
