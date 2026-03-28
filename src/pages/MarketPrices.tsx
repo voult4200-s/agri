@@ -56,41 +56,63 @@ const categories = ["All", "Cereals", "Vegetables", "Oilseeds", "Cash Crops", "P
 
 const fetchMarketPrices = async () => {
   try {
-    // Using data.gov.in API for real-time mandi prices
+    // Try data.gov.in API first (India agricultural prices)
     const apiUrl = "https://api.data.gov.in/resource/9ef2731d-91f2-4fd2-a055-14f777e43997";
-    const apiKey = "579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b"; // Public demo key
+    const apiKey = "579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b";
     
-    const url = `${apiUrl}?api-key=${apiKey}&format=json&limit=500`;
+    const url = `${apiUrl}?api-key=${apiKey}&format=json&limit=1000&offset=0`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
+      signal: controller.signal,
     });
     
+    clearTimeout(timeoutId);
+    
     if (!response.ok) {
-      console.warn("Market API call failed:", response.status);
-      return []; // Return empty array, fallback to mock data
+      console.warn(`Market API HTTP ${response.status}:`, response.statusText);
+      return [];
     }
     
     const data = await response.json();
     
-    if (data.records && Array.isArray(data.records)) {
+    if (data.records && Array.isArray(data.records) && data.records.length > 0) {
+      console.log("✅ Live prices fetched:", data.records.length, "records");
+      
       // Map API data to our crop format
       return data.records.map((record: any) => ({
-        commodity: record.commodity || '',
+        commodity: String(record.commodity || '').trim(),
         modal_price: parseFloat(record.modal_price) || 0,
-        market: record.market || '',
-        state: record.state || '',
+        market: String(record.market || '').trim(),
+        state: String(record.state || '').trim(),
         date: record.arrival_date || new Date().toLocaleDateString(),
-      }));
+      })).filter((r: any) => r.modal_price > 0); // Only valid prices
     }
     
+    console.warn("⚠️ No records in API response");
     return [];
+    
   } catch (error) {
-    console.warn("Market price fetch error:", error instanceof Error ? error.message : String(error));
-    // Silently fail and use mock data instead
+    const errMsg = error instanceof Error ? error.message : String(error);
+    
+    // Distinguish between different error types
+    if (errMsg.includes("AbortError") || errMsg.includes("timeout")) {
+      console.warn("⏱️ Market API timeout - network slow");
+    } else if (errMsg.includes("Failed to fetch") || errMsg.includes("NetworkError")) {
+      console.warn("🌐 Market API network error - check internet");
+    } else if (errMsg.includes("CORS")) {
+      console.warn("🔒 Market API CORS blocked");
+    } else {
+      console.warn("❌ Market API error:", errMsg);
+    }
+    
     return [];
   }
 };
@@ -101,28 +123,52 @@ export default function MarketPrices() {
   const [selectedCrop, setSelectedCrop] = useState<CropPrice | null>(null);
   const [sortBy, setSortBy] = useState<"name" | "price" | "change">("change");
 
-  const { data: apiRecords, isLoading } = useQuery({
+  const { data: apiRecords, isLoading, isFetching } = useQuery({
     queryKey: ["marketPrices"],
     queryFn: fetchMarketPrices,
-    refetchInterval: 3600000, // Refresh hourly
+    refetchInterval: 300000, // Refetch every 5 minutes (300000 ms)
+    staleTime: 240000, // Data is fresh for 4 minutes
+    gcTime: 600000, // Cache for 10 minutes
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
   const liveCrops = useMemo(() => {
-    if (!apiRecords || apiRecords.length === 0) return crops;
+    // If API returned no data, use mock crops
+    if (!apiRecords || apiRecords.length === 0) {
+      console.log("📊 Using mock crop data (API unavailable)");
+      return crops;
+    }
+
+    console.log("🔄 Updating prices from live API data...");
 
     return crops.map(c => {
-      // Match by cleaning names (e.g. "Rice (Basmati)" becomes "rice")
       const cleanName = c.name.split("(")[0].trim().toLowerCase();
-      const live = apiRecords.find((r: any) => 
-        r.commodity.toLowerCase().includes(cleanName) || 
-        cleanName.includes(r.commodity.toLowerCase())
-      );
-      if (live) {
+      
+      // Try multiple matching strategies
+      const live = apiRecords.find((r: any) => {
+        const commodityLower = r.commodity.toLowerCase();
+        
+        // Exact word match
+        if (commodityLower === cleanName) return true;
+        
+        // Substring match
+        if (commodityLower.includes(cleanName) || cleanName.includes(commodityLower)) return true;
+        
+        // For multi-word crops (e.g., "green chilli" matches "chilli")
+        const nameWords = cleanName.split(" ");
+        const commodityWords = commodityLower.split(" ");
+        if (nameWords.some(w => commodityWords.includes(w))) return true;
+        
+        return false;
+      });
+      
+      if (live && live.modal_price > 0) {
         return {
           ...c,
-          price: Number(live.modal_price) || c.price,
-          mandi: live.market,
-          state: live.state,
+          price: Math.round(live.modal_price), // Round to nearest integer
+          mandi: live.market || c.mandi,
+          state: live.state || c.state,
         };
       }
       return c;
@@ -162,7 +208,14 @@ export default function MarketPrices() {
       {isLoading && (
         <div className="flex items-center gap-2 text-xs text-primary mb-4 animate-pulse">
           <Loader2 className="w-3 h-3 animate-spin" />
-          Updating live prices from Mandi...
+          Loading live prices from Mandi APIs...
+        </div>
+      )}
+
+      {isFetching && !isLoading && (
+        <div className="flex items-center gap-2 text-xs text-success mb-4 animate-pulse">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Updating live prices...
         </div>
       )}
 
