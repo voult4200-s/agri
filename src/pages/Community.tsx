@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Users, MessageSquare, ThumbsUp, Share2, Search, Plus, X,
   TrendingUp, Leaf, Bug, CloudSun, Tractor, HelpCircle, Filter,
-  Heart, MessageCircle, Eye, Clock, ChevronDown,
+  Heart, MessageCircle, Eye, Clock, ChevronDown, LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 const categories = [
   { id: "all", label: "All Topics", icon: Users },
@@ -27,97 +31,38 @@ const categories = [
 ];
 
 interface Post {
-  id: number;
+  id: string;
+  user_id: string;
   author: string;
   avatar: string;
-  location: string;
+  location?: string;
   category: string;
   title: string;
   content: string;
   image?: string;
-  likes: number;
+  likes_count: number;
   comments: Comment[];
-  views: number;
-  timeAgo: string;
+  views_count: number;
+  created_at: string;
   tags: string[];
-  liked: boolean;
+  liked_by_user: boolean;
 }
 
 interface Comment {
-  id: number;
+  id: string;
   author: string;
   avatar: string;
   content: string;
-  timeAgo: string;
-  likes: number;
+  created_at: string;
+  likes_count: number;
+  user_id: string;
 }
 
-const initialPosts: Post[] = [
-  {
-    id: 1, author: "Ramesh Patel", avatar: "RP", location: "Gujarat",
-    category: "crops", title: "Best organic fertilizer for wheat this Rabi season?",
-    content: "I've been using vermicompost for the last 2 years but yields aren't improving. My soil is clay-loamy with pH around 7.2. Any suggestions for organic alternatives that work well for wheat in Gujarat's climate?",
-    likes: 24, views: 156, timeAgo: "2 hours ago", tags: ["wheat", "organic", "rabi"],
-    liked: false,
-    comments: [
-      { id: 1, author: "Suresh Kumar", avatar: "SK", content: "Try neem cake mixed with vermicompost in 1:3 ratio. Worked wonders for my wheat crop last season!", timeAgo: "1 hour ago", likes: 8 },
-      { id: 2, author: "Anita Devi", avatar: "AD", content: "Have you tested your soil micronutrients? Sometimes it's zinc deficiency, not fertilizer issue.", timeAgo: "45 min ago", likes: 5 },
-    ],
-  },
-  {
-    id: 2, author: "Lakshmi Naidu", avatar: "LN", location: "Andhra Pradesh",
-    category: "pests", title: "Yellow mosaic virus spotted on my moong dal crop 🚨",
-    content: "Found yellow patches on leaves spreading fast. Already sprayed neem oil but no improvement. The whitefly population is very high this year. Need urgent advice before it spreads to the entire 3-acre field!",
-    likes: 42, views: 289, timeAgo: "5 hours ago", tags: ["pest-alert", "moong", "urgent"],
-    liked: false,
-    comments: [
-      { id: 3, author: "Dr. Sharma", avatar: "DS", content: "Use Imidacloprid 17.8% SL @ 0.3ml/L to control whitefly first. Remove and burn heavily infected plants immediately.", timeAgo: "4 hours ago", likes: 15 },
-    ],
-  },
-  {
-    id: 3, author: "Harpreet Singh", avatar: "HS", location: "Punjab",
-    category: "equipment", title: "Review: New solar-powered drip irrigation system",
-    content: "Installed a 5HP solar pump with micro-drip system last month for my 8-acre sugarcane field. Electricity bill dropped by 70% and water usage reduced by 40%. Total cost was ₹3.2 lakh with 40% government subsidy. Happy to answer questions!",
-    likes: 87, views: 512, timeAgo: "1 day ago", tags: ["solar", "irrigation", "review"],
-    liked: false,
-    comments: [
-      { id: 4, author: "Rajesh Meena", avatar: "RM", content: "Which brand did you go with? I'm planning the same for my farm.", timeAgo: "20 hours ago", likes: 3 },
-      { id: 5, author: "Vikram Joshi", avatar: "VJ", content: "Great investment! I've been using solar pump for 2 years now. Maintenance is minimal.", timeAgo: "18 hours ago", likes: 6 },
-      { id: 6, author: "Harpreet Singh", avatar: "HS", content: "I used Tata Solar panels with Kirloskar pump. Very reliable so far.", timeAgo: "16 hours ago", likes: 4 },
-    ],
-  },
-  {
-    id: 4, author: "Meena Kumari", avatar: "MK", location: "Rajasthan",
-    category: "market", title: "Cumin prices expected to rise — hold your stock!",
-    content: "According to NCDEX futures and current demand from export markets, cumin (jeera) prices are likely to increase by 15-20% in the next 2 months. Current mandi rate in Unjha is ₹52,000/quintal. Consider holding if you have good storage facilities.",
-    likes: 63, views: 445, timeAgo: "1 day ago", tags: ["cumin", "price-forecast", "market"],
-    liked: false,
-    comments: [],
-  },
-  {
-    id: 5, author: "Amit Yadav", avatar: "AY", location: "Uttar Pradesh",
-    category: "weather", title: "Late frost warning for North India — protect your crops!",
-    content: "IMD has predicted unexpected frost in parts of UP, Bihar, and MP this week. If you have standing mustard or potato crop, consider light irrigation in the evening to protect from frost damage. Cover nursery beds with plastic sheets.",
-    likes: 91, views: 678, timeAgo: "3 hours ago", tags: ["frost", "weather-alert", "north-india"],
-    liked: false,
-    comments: [
-      { id: 7, author: "Sita Ram", avatar: "SR", content: "Thanks for the warning! Just irrigated my potato field.", timeAgo: "2 hours ago", likes: 12 },
-    ],
-  },
-  {
-    id: 6, author: "Priya Sharma", avatar: "PS", location: "Madhya Pradesh",
-    category: "help", title: "First time growing strawberries — need guidance",
-    content: "I want to try strawberry cultivation on 1 acre. I'm in Bhopal region with black soil. Can anyone guide me on variety selection, planting time, and expected investment? Is polyhouse necessary or can I grow in open field?",
-    likes: 18, views: 134, timeAgo: "6 hours ago", tags: ["strawberry", "beginner", "guidance"],
-    liked: false,
-    comments: [
-      { id: 8, author: "Kisan Expert", avatar: "KE", content: "Go with Camarosa or Winter Dawn variety. Best planting time is October. Open field is possible but polyhouse gives 3x better yield.", timeAgo: "5 hours ago", likes: 9 },
-    ],
-  },
-];
-
 export default function Community() {
-  const [posts, setPosts] = useState<Post[]>(initialPosts);
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -131,61 +76,173 @@ export default function Community() {
   const [newCategory, setNewCategory] = useState("");
   const [newTags, setNewTags] = useState("");
 
+  // Fetch posts from Supabase
+  const { data: posts = [], isLoading } = useQuery({
+    queryKey: ["communityPosts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("community_posts")
+        .select(`
+          id, user_id, title, content, category, tags, likes_count, views_count, created_at,
+          profiles(full_name)
+        `)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      // If no data, return empty (will show "No posts" message)
+      if (!data) return [];
+
+      return (data as any[]).map((post) => ({
+        id: post.id,
+        user_id: post.user_id,
+        author: post.profiles?.full_name || "Anonymous",
+        avatar: (post.profiles?.full_name || "A")[0].toUpperCase(),
+        category: post.category,
+        title: post.title,
+        content: post.content,
+        likes_count: post.likes_count || 0,
+        comments: [],
+        views_count: post.views_count || 0,
+        created_at: post.created_at,
+        tags: post.tags || [],
+        liked_by_user: false,
+      }));
+    },
+  });
+
+  // Create post mutation
+  const createPostMutation = useMutation({
+    mutationFn: async (data: { title: string; content: string; category: string; tags: string[] }) => {
+      const { data: post, error } = await supabase
+        .from("community_posts")
+        .insert([
+          {
+            user_id: user?.id,
+            title: data.title,
+            content: data.content,
+            category: data.category,
+            tags: data.tags,
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      return post;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["communityPosts"] });
+      setNewTitle("");
+      setNewContent("");
+      setNewCategory("");
+      setNewTags("");
+      setShowCreateDialog(false);
+    },
+  });
+
+  // Like post mutation
+  const likePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const { error: checkError } = await supabase
+        .from("community_post_likes")
+        .select()
+        .eq("post_id", postId)
+        .eq("user_id", user?.id)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      // For simplicity, we'll just toggle the like count
+      const post = posts.find((p) => p.id === postId);
+      const isLiked = post?.liked_by_user;
+
+      if (isLiked) {
+        const { error } = await supabase
+          .from("community_post_likes")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", user?.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("community_post_likes")
+          .insert([{ post_id: postId, user_id: user?.id }]);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["communityPosts"] });
+    },
+  });
+
+  // Add comment mutation
+  const addCommentMutation = useMutation({
+    mutationFn: async (data: { postId: string; content: string }) => {
+      const { error } = await supabase
+        .from("community_comments")
+        .insert([
+          {
+            post_id: data.postId,
+            user_id: user?.id,
+            content: data.content,
+          },
+        ]);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setNewComment("");
+      queryClient.invalidateQueries({ queryKey: ["communityPosts"] });
+    },
+  });
+
   const filteredPosts = posts
     .filter((p) => activeCategory === "all" || p.category === activeCategory)
     .filter(
       (p) =>
         searchQuery === "" ||
         p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
+        (p.tags && p.tags.some((t: string) => t.toLowerCase().includes(searchQuery.toLowerCase())))
     )
     .sort((a, b) => {
-      if (sortBy === "popular") return b.likes - a.likes;
-      if (sortBy === "mostViewed") return b.views - a.views;
-      return b.id - a.id;
+      if (sortBy === "popular") return (b.likes_count || 0) - (a.likes_count || 0);
+      if (sortBy === "mostViewed") return (b.views_count || 0) - (a.views_count || 0);
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-  const handleLike = (postId: number) => {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
-          : p
-      )
-    );
-    if (selectedPost?.id === postId) {
-      setSelectedPost((prev) =>
-        prev ? { ...prev, liked: !prev.liked, likes: prev.liked ? prev.likes - 1 : prev.likes + 1 } : prev
-      );
+  const handleCreatePost = () => {
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
     }
+    if (!newTitle.trim() || !newContent.trim() || !newCategory) return;
+    createPostMutation.mutate({
+      title: newTitle,
+      content: newContent,
+      category: newCategory,
+      tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
+    });
   };
 
   const handleAddComment = () => {
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
     if (!newComment.trim() || !selectedPost) return;
-    const comment: Comment = {
-      id: Date.now(), author: "You", avatar: "YO",
-      content: newComment, timeAgo: "Just now", likes: 0,
-    };
-    const updated = posts.map((p) =>
-      p.id === selectedPost.id ? { ...p, comments: [...p.comments, comment] } : p
-    );
-    setPosts(updated);
-    setSelectedPost((prev) => prev ? { ...prev, comments: [...prev.comments, comment] } : prev);
-    setNewComment("");
+    addCommentMutation.mutate({
+      postId: selectedPost.id,
+      content: newComment,
+    });
   };
 
-  const handleCreatePost = () => {
-    if (!newTitle.trim() || !newContent.trim() || !newCategory) return;
-    const post: Post = {
-      id: Date.now(), author: "You", avatar: "YO", location: "Your Location",
-      category: newCategory, title: newTitle, content: newContent,
-      likes: 0, views: 0, timeAgo: "Just now",
-      tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
-      liked: false, comments: [],
-    };
-    setPosts([post, ...posts]);
-    setNewTitle(""); setNewContent(""); setNewCategory(""); setNewTags("");
-    setShowCreateDialog(false);
+  const handleLike = (postId: string) => {
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+    likePostMutation.mutate(postId);
   };
 
   const getCategoryColor = (cat: string) => {
@@ -200,42 +257,79 @@ export default function Community() {
     return map[cat] || "bg-muted text-muted-foreground border-border";
   };
 
+  const getTimeAgo = (date: string) => {
+    const now = new Date();
+    const postDate = new Date(date);
+    const seconds = Math.floor((now.getTime() - postDate.getTime()) / 1000);
+
+    if (seconds < 60) return "Just now";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+    return postDate.toLocaleDateString();
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground">Community Forum</h1>
-          <p className="text-sm text-muted-foreground">Connect, share, and learn from fellow farmers</p>
+          <p className="text-sm text-muted-foreground">
+            {isAuthenticated
+              ? "Connect, share, and learn from fellow farmers"
+              : "Sign in to join the conversation"}
+          </p>
         </div>
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button className="gradient-warm text-secondary-foreground border-0 hover:opacity-90 gap-2">
-              <Plus className="w-4 h-4" /> New Post
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="font-heading">Create a Post</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <Input placeholder="Post title..." value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-              <Select value={newCategory} onValueChange={setNewCategory}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                <SelectContent>
-                  {categories.filter((c) => c.id !== "all").map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Textarea placeholder="Share your thoughts, questions, or tips..." rows={5} value={newContent} onChange={(e) => setNewContent(e.target.value)} />
-              <Input placeholder="Tags (comma-separated)" value={newTags} onChange={(e) => setNewTags(e.target.value)} />
-              <Button onClick={handleCreatePost} className="w-full gradient-warm text-secondary-foreground border-0">
-                Publish Post
+        {isAuthenticated ? (
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button className="gradient-warm text-secondary-foreground border-0 hover:opacity-90 gap-2">
+                <Plus className="w-4 h-4" /> New Post
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="font-heading">Create a Post</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <Input placeholder="Post title..." value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+                <Select value={newCategory} onValueChange={setNewCategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories
+                      .filter((c) => c.id !== "all")
+                      .map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <Textarea
+                  placeholder="Share your thoughts, questions, or tips..."
+                  rows={5}
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                />
+                <Input placeholder="Tags (comma-separated)" value={newTags} onChange={(e) => setNewTags(e.target.value)} />
+                <Button
+                  onClick={handleCreatePost}
+                  disabled={createPostMutation.isPending}
+                  className="w-full gradient-warm text-secondary-foreground border-0"
+                >
+                  {createPostMutation.isPending ? "Publishing..." : "Publish Post"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <Button onClick={() => navigate("/auth")} className="gradient-warm text-secondary-foreground border-0 gap-2">
+            <LogIn className="w-4 h-4" /> Sign In to Post
+          </Button>
+        )}
       </div>
 
       {/* Search & Sort */}
@@ -282,58 +376,82 @@ export default function Community() {
 
       {/* Posts */}
       <div className="grid gap-4">
-        <AnimatePresence mode="popLayout">
-          {filteredPosts.map((post) => (
-            <motion.div
-              key={post.id}
-              layout
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-card border border-border rounded-xl p-5 hover:shadow-[var(--shadow-card)] transition-shadow cursor-pointer"
-              onClick={() => setSelectedPost(post)}
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-heading font-bold text-xs shrink-0">
-                  {post.avatar}
+        {isLoading ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <div className="w-12 h-12 rounded-full gradient-hero animate-spin border-4 border-transparent border-t-primary mx-auto mb-3" />
+            <p className="font-medium">Loading posts...</p>
+          </div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {filteredPosts.map((post) => (
+              <motion.div
+                key={post.id}
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-card border border-border rounded-xl p-5 hover:shadow-[var(--shadow-card)] transition-shadow cursor-pointer"
+                onClick={() => setSelectedPost(post)}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-heading font-bold text-xs shrink-0">
+                    {post.avatar}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="font-medium text-sm text-foreground">{post.author}</span>
+                      <span className="text-xs text-muted-foreground">· {getTimeAgo(post.created_at)}</span>
+                    </div>
+                    <h3 className="font-heading font-semibold text-foreground mb-2 line-clamp-1">{post.title}</h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{post.content}</p>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Badge variant="outline" className={getCategoryColor(post.category)}>
+                        {categories.find((c) => c.id === post.category)?.label}
+                      </Badge>
+                      {post.tags.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-5 mt-3 text-muted-foreground">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLike(post.id);
+                        }}
+                        className={`flex items-center gap-1.5 text-xs hover:text-destructive transition-colors ${
+                          post.liked_by_user ? "text-destructive" : ""
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${post.liked_by_user ? "fill-current" : ""}`} /> {post.likes_count}
+                      </button>
+                      <span className="flex items-center gap-1.5 text-xs">
+                        <MessageCircle className="w-4 h-4" /> {post.comments.length}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-xs">
+                        <Eye className="w-4 h-4" /> {post.views_count}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-medium text-sm text-foreground">{post.author}</span>
-                    <span className="text-xs text-muted-foreground">· {post.location}</span>
-                    <span className="text-xs text-muted-foreground">· {post.timeAgo}</span>
-                  </div>
-                  <h3 className="font-heading font-semibold text-foreground mb-2 line-clamp-1">{post.title}</h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{post.content}</p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <Badge variant="outline" className={getCategoryColor(post.category)}>
-                      {categories.find((c) => c.id === post.category)?.label}
-                    </Badge>
-                    {post.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">#{tag}</span>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-5 mt-3 text-muted-foreground">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleLike(post.id); }}
-                      className={`flex items-center gap-1.5 text-xs hover:text-destructive transition-colors ${post.liked ? "text-destructive" : ""}`}
-                    >
-                      <Heart className={`w-4 h-4 ${post.liked ? "fill-current" : ""}`} /> {post.likes}
-                    </button>
-                    <span className="flex items-center gap-1.5 text-xs"><MessageCircle className="w-4 h-4" /> {post.comments.length}</span>
-                    <span className="flex items-center gap-1.5 text-xs"><Eye className="w-4 h-4" /> {post.views}</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        )}
 
-        {filteredPosts.length === 0 && (
+        {!isLoading && filteredPosts.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
             <p className="font-medium">No posts found</p>
-            <p className="text-sm">Try a different category or search term</p>
+            <p className="text-sm">
+              {isAuthenticated
+                ? "Try a different category or search term"
+                : "Sign in to start posting and joining discussions"}
+            </p>
           </div>
         )}
       </div>
@@ -350,7 +468,7 @@ export default function Community() {
                   </div>
                   <div>
                     <p className="font-medium text-sm">{selectedPost.author}</p>
-                    <p className="text-xs text-muted-foreground">{selectedPost.location} · {selectedPost.timeAgo}</p>
+                    <p className="text-xs text-muted-foreground">{getTimeAgo(selectedPost.created_at)}</p>
                   </div>
                 </div>
                 <DialogTitle className="font-heading text-lg">{selectedPost.title}</DialogTitle>
@@ -362,17 +480,24 @@ export default function Community() {
                     {categories.find((c) => c.id === selectedPost.category)?.label}
                   </Badge>
                   {selectedPost.tags.map((tag) => (
-                    <span key={tag} className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">#{tag}</span>
+                    <span key={tag} className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                      #{tag}
+                    </span>
                   ))}
                 </div>
                 <div className="flex items-center gap-5 text-muted-foreground border-y border-border py-3">
                   <button
                     onClick={() => handleLike(selectedPost.id)}
-                    className={`flex items-center gap-1.5 text-sm hover:text-destructive transition-colors ${selectedPost.liked ? "text-destructive" : ""}`}
+                    className={`flex items-center gap-1.5 text-sm hover:text-destructive transition-colors ${
+                      selectedPost.liked_by_user ? "text-destructive" : ""
+                    }`}
                   >
-                    <Heart className={`w-4 h-4 ${selectedPost.liked ? "fill-current" : ""}`} /> {selectedPost.likes} Likes
+                    <Heart className={`w-4 h-4 ${selectedPost.liked_by_user ? "fill-current" : ""}`} />{" "}
+                    {selectedPost.likes_count} Likes
                   </button>
-                  <span className="flex items-center gap-1.5 text-sm"><Eye className="w-4 h-4" /> {selectedPost.views} Views</span>
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <Eye className="w-4 h-4" /> {selectedPost.views_count} Views
+                  </span>
                   <button className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors ml-auto">
                     <Share2 className="w-4 h-4" /> Share
                   </button>
@@ -381,41 +506,64 @@ export default function Community() {
                 {/* Comments */}
                 <div>
                   <h4 className="font-heading font-semibold text-sm mb-3">Comments ({selectedPost.comments.length})</h4>
-                  <div className="space-y-3">
-                    {selectedPost.comments.map((comment) => (
-                      <div key={comment.id} className="flex gap-3 bg-muted/50 rounded-lg p-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-heading font-bold text-[10px] shrink-0">
-                          {comment.avatar}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-xs">{comment.author}</span>
-                            <span className="text-[10px] text-muted-foreground">{comment.timeAgo}</span>
+                  {isAuthenticated ? (
+                    <div className="space-y-3">
+                      {selectedPost.comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-3 bg-muted/50 rounded-lg p-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-heading font-bold text-[10px] shrink-0">
+                            {comment.avatar}
                           </div>
-                          <p className="text-sm text-muted-foreground">{comment.content}</p>
-                          <button className="flex items-center gap-1 text-xs text-muted-foreground mt-1.5 hover:text-foreground">
-                            <ThumbsUp className="w-3 h-3" /> {comment.likes}
-                          </button>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-xs">{comment.author}</span>
+                              <span className="text-[10px] text-muted-foreground">{getTimeAgo(comment.created_at)}</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{comment.content}</p>
+                            <button className="flex items-center gap-1 text-xs text-muted-foreground mt-1.5 hover:text-foreground">
+                              <ThumbsUp className="w-3 h-3" /> {comment.likes_count}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground border border-border rounded-lg">
+                      <p className="text-sm mb-3">Sign in to view and post comments</p>
+                      <Button
+                        onClick={() => navigate("/auth")}
+                        className="gradient-warm text-secondary-foreground border-0 gap-2"
+                      >
+                        <LogIn className="w-4 h-4" /> Sign In
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Add Comment */}
-                <div className="flex gap-2 pt-2">
-                  <Textarea
-                    placeholder="Write a reply..."
-                    rows={2}
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    className="flex-1"
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }}
-                  />
-                  <Button onClick={handleAddComment} className="self-end gradient-warm text-secondary-foreground border-0">
-                    Reply
-                  </Button>
-                </div>
+                {isAuthenticated && (
+                  <div className="flex gap-2 pt-2">
+                    <Textarea
+                      placeholder="Write a reply..."
+                      rows={2}
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddComment();
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={handleAddComment}
+                      disabled={addCommentMutation.isPending}
+                      className="self-end gradient-warm text-secondary-foreground border-0"
+                    >
+                      {addCommentMutation.isPending ? "..." : "Reply"}
+                    </Button>
+                  </div>
+                )}
               </div>
             </>
           )}
