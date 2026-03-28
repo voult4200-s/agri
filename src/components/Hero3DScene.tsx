@@ -163,8 +163,30 @@ function ErrorFallback() {
 
 export default function Hero3DScene() {
   const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [webglSupported, setWebglSupported] = useState(true);
 
-  if (hasError) return <ErrorFallback />;
+  useEffect(() => {
+    // Check WebGL support
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) {
+      setWebglSupported(false);
+      setHasError(true);
+      return;
+    }
+
+    // Fallback timeout for WebGL initialization
+    const timeout = setTimeout(() => {
+      if (isLoading) {
+        setHasError(true);
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [isLoading]);
+
+  if (hasError || !webglSupported) return <ErrorFallback />;
 
   return (
     <div className="w-full h-full min-h-[500px]" style={{ cursor: "grab" }}>
@@ -175,10 +197,20 @@ export default function Hero3DScene() {
           antialias: false, 
           alpha: true,
           powerPreference: "high-performance",
-          failIfMajorPerformanceCaveat: true
+          failIfMajorPerformanceCaveat: false
         }}
         onCreated={({ gl }) => {
-          gl.domElement.addEventListener('webglcontextlost', () => setHasError(true), false);
+          setIsLoading(false);
+          gl.domElement.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            setHasError(true);
+          }, false);
+          gl.domElement.addEventListener('webglcontextrestored', () => {
+            setHasError(false);
+          }, false);
+        }}
+        onError={() => {
+          setHasError(true);
         }}
         style={{ background: "transparent", overflow: "visible" }}
       >

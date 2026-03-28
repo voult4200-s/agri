@@ -16,6 +16,12 @@ interface AppUser {
   full_name: string;
 }
 
+interface AuthUserLike {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+}
+
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
@@ -42,61 +48,122 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const ensureProfile = useCallback(async (authUser: { id: string; email?: string | null; user_metadata?: Record<string, any> }) => {
-    const fallbackName =
-      authUser.user_metadata?.full_name ||
-      (authUser.email ? authUser.email.split("@")[0] : "Farmer");
+  const getFallbackName = useCallback((authUser: AuthUserLike) => {
+    const metadataName =
+      typeof authUser.user_metadata?.full_name === "string"
+        ? authUser.user_metadata.full_name
+        : null;
 
-    await supabase.from("profiles").upsert(
+    return metadataName || (authUser.email ? authUser.email.split("@")[0] : "Farmer");
+  }, []);
+
+  const mapAuthUserFallback = useCallback((authUser: AuthUserLike): AppUser => {
+    return {
+      id: authUser.id,
+      email: authUser.email || "",
+      full_name: getFallbackName(authUser),
+    };
+  }, [getFallbackName]);
+
+  const withTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 8000): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Operation timed out")), timeoutMs);
+      });
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }, []);
+
+  const ensureProfile = useCallback(async (authUser: AuthUserLike) => {
+    const fallbackName = getFallbackName(authUser);
+
+    const { error } = await supabase.from("profiles").upsert(
       {
         user_id: authUser.id,
         full_name: fallbackName,
       },
       { onConflict: "user_id" }
     );
-  }, []);
 
-  const mapUser = useCallback(async (authUser: { id: string; email?: string | null; user_metadata?: Record<string, any> }) => {
-    const { data: profile } = await supabase
+    if (error) {
+      throw error;
+    }
+  }, [getFallbackName]);
+
+  const mapUser = useCallback(async (authUser: AuthUserLike) => {
+    const { data: profile, error } = await supabase
       .from("profiles")
       .select("full_name")
       .eq("user_id", authUser.id)
       .maybeSingle();
+
+    if (error) {
+      return mapAuthUserFallback(authUser);
+    }
 
     return {
       id: authUser.id,
       email: authUser.email || "",
       full_name:
         profile?.full_name ||
-        authUser.user_metadata?.full_name ||
-        (authUser.email ? authUser.email.split("@")[0] : "Farmer"),
+        getFallbackName(authUser),
     } satisfies AppUser;
-  }, []);
+  }, [getFallbackName, mapAuthUserFallback]);
 
   useEffect(() => {
     let mounted = true;
 
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
+      try {
+        const { data } = await withTimeout(supabase.auth.getSession());
+        if (!mounted) return;
 
-      if (data.session?.user) {
-        await ensureProfile(data.session.user);
-        const mappedUser = await mapUser(data.session.user);
-        if (mounted) setUser(mappedUser);
+        if (data.session?.user) {
+          try {
+            await withTimeout(ensureProfile(data.session.user));
+          } catch {
+            // Do not block auth flow if profile table policies fail on some devices.
+          }
+
+          const mappedUser = await withTimeout(mapUser(data.session.user));
+          if (mounted) setUser(mappedUser);
+        }
+      } catch {
+        if (mounted) {
+          setUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     })();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_, session) => {
-      if (session?.user) {
-        await ensureProfile(session.user);
-        const mappedUser = await mapUser(session.user);
-        setUser(mappedUser);
-      } else {
-        setUser(null);
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      try {
+        if (session?.user) {
+          try {
+            await withTimeout(ensureProfile(session.user));
+          } catch {
+            // Auth can still proceed even if profile write is blocked.
+          }
+
+          const mappedUser = await withTimeout(mapUser(session.user));
+          setUser(mappedUser);
+        } else {
+          setUser(null);
+        }
+      } catch {
+        if (session?.user) {
+          setUser(mapAuthUserFallback(session.user));
+        } else {
+          setUser(null);
+        }
       }
     });
 
@@ -104,68 +171,99 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [ensureProfile, mapUser]);
+  }, [ensureProfile, mapAuthUserFallback, mapUser, withTimeout]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        })
+      );
 
-    if (error) {
-      return { error: error.message };
+      if (error) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes("email not confirmed") || msg.includes("not confirmed")) {
+          return { error: "Email verify koren, tarpor login korun." };
+        }
+        return { error: error.message };
+      }
+
+      if (data.user) {
+        try {
+          await withTimeout(ensureProfile(data.user));
+        } catch {
+          // Non-critical, continue login.
+        }
+
+        const mappedUser = await withTimeout(mapUser(data.user));
+        setUser(mappedUser);
+      }
+
+      return {};
+    } catch {
+      return { error: "Login e timeout hocche. Network check kore abar try korun." };
     }
-
-    if (data.user) {
-      await ensureProfile(data.user);
-      const mappedUser = await mapUser(data.user);
-      setUser(mappedUser);
-    }
-
-    return {};
-  }, [ensureProfile, mapUser]);
+  }, [ensureProfile, mapUser, withTimeout]);
 
   const signUp = useCallback(async (email: string, password: string, fullName: string, profile?: SignupProfileInput) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-
-    if (error) {
-      return { error: error.message };
-    }
-
-    if (data.user) {
-      await supabase.from("profiles").upsert(
-        {
-          user_id: data.user.id,
-          full_name: fullName,
-          mobile_number: profile?.mobile || null,
-          state: profile?.state || null,
-          district: profile?.district || null,
-          village: profile?.village || null,
-          pin_code: profile?.pin_code || null,
-          farm_size: profile?.farm_size ?? null,
-        },
-        { onConflict: "user_id" }
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const { data, error } = await withTimeout(
+        supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            },
+          },
+        })
       );
-    }
 
-    if (data.session?.user) {
-      const mappedUser = await mapUser(data.session.user);
-      setUser(mappedUser);
-      return {};
-    }
+      if (error) {
+        // Email verification not confirmed - allow them to know
+        if (error.message.toLowerCase().includes("confirm")) {
+          return { error: "Email-e confirmation link bhejgechi. Email verify kore abar login korun." };
+        }
+        return { error: error.message };
+      }
 
-    return {
-      message: "Signup successful. Please verify your email before signing in.",
-    };
-  }, [mapUser]);
+      if (data.user) {
+        try {
+          await withTimeout(supabase.from("profiles").upsert(
+            {
+              user_id: data.user.id,
+              full_name: fullName,
+              mobile_number: profile?.mobile || null,
+              state: profile?.state || null,
+              district: profile?.district || null,
+              village: profile?.village || null,
+              pin_code: profile?.pin_code || null,
+              farm_size: profile?.farm_size ?? null,
+            },
+            { onConflict: "user_id" }
+          ));
+        } catch {
+          // Profile creation failed - but don't block signup
+          console.warn("Profile creation failed, but signup completed");
+        }
+      }
+
+      if (data.session?.user) {
+        const mappedUser = await withTimeout(mapUser(data.session.user));
+        setUser(mappedUser);
+        return { message: "Account created successfully!" };
+      } else {
+        // Email confirmation required
+        return { message: "Account created! Email-e verification link phechechi. Verify kore login korun." };
+      }
+    } catch {
+      return { error: "Signup e timeout hocche. Network check kore abar try korun." };
+    }
+  }, [mapUser, withTimeout]);
 
   const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {

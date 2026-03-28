@@ -61,11 +61,14 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    const result = await signIn(loginEmail, loginPassword);
-    setLoading(false);
-    if (result.error) {
-      toast({ title: "Login Failed", description: result.error, variant: "destructive" });
+    try {
+      setLoading(true);
+      const result = await signIn(loginEmail, loginPassword);
+      if (result.error) {
+        toast({ title: "Login Failed", description: result.error, variant: "destructive" });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,34 +86,40 @@ export default function Auth() {
       setSignupStep(2);
       return;
     }
-    setLoading(true);
-    const result = await signUp(signupEmail, signupPassword, fullName, {
-      mobile: signupPhone || undefined,
-      state: state || undefined,
-      district: district || undefined,
-      village: village || undefined,
-      pin_code: pinCode || undefined,
-      farm_size: farmSize ? Number(farmSize) : null,
-    });
-    setLoading(false);
-    if (result.error) {
-      toast({ title: "Signup Failed", description: result.error, variant: "destructive" });
-    } else {
-      toast({ title: "Account created!", description: result.message || "Welcome to KrishiGrowAI!" });
+    try {
+      setLoading(true);
+      const result = await signUp(signupEmail, signupPassword, fullName, {
+        mobile: signupPhone || undefined,
+        state: state || undefined,
+        district: district || undefined,
+        village: village || undefined,
+        pin_code: pinCode || undefined,
+        farm_size: farmSize ? Number(farmSize) : null,
+      });
+      if (result.error) {
+        toast({ title: "Signup Failed", description: result.error, variant: "destructive" });
+      } else {
+        toast({ title: "Account created!", description: result.message || "Welcome to KrishiGrowAI!" });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    const result = await resetPassword(forgotEmail);
-    setLoading(false);
-    if (result.error) {
-      toast({ title: "Reset failed", description: result.error, variant: "destructive" });
-      return;
+    try {
+      setLoading(true);
+      const result = await resetPassword(forgotEmail);
+      if (result.error) {
+        toast({ title: "Reset failed", description: result.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Reset link sent!", description: "Please check your email inbox." });
+      setMode("login");
+    } finally {
+      setLoading(false);
     }
-    toast({ title: "Reset link sent!", description: "Please check your email inbox." });
-    setMode("login");
   };
 
   const stats = [
