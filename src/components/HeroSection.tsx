@@ -20,9 +20,9 @@ function HandwritingText({ text, delay = 0, className = "" }: { text: string; de
         if (i >= text.length) {
           clearInterval(interval);
           // Hide cursor after typing finishes
-          setTimeout(() => setShowCursor(false), 800);
+          setTimeout(() => setShowCursor(false), 400); // Reduced from 800ms
         }
-      }, 70 + Math.random() * 40); // Slightly randomized for natural feel
+      }, 50 + Math.random() * 30); // Reduced from 70+40ms for faster typing
       return () => clearInterval(interval);
     }, delay * 1000);
     return () => clearTimeout(startTimeout);
@@ -40,7 +40,7 @@ function HandwritingText({ text, delay = 0, className = "" }: { text: string; de
               : { opacity: 0, y: 8, rotateZ: -3 }
           }
           transition={{
-            duration: 0.15,
+            duration: 0.1, // Reduced from 0.15
             ease: "easeOut",
           }}
           style={{ display: "inline-block", whiteSpace: "pre" }}
@@ -51,7 +51,7 @@ function HandwritingText({ text, delay = 0, className = "" }: { text: string; de
       {showCursor && displayedChars < text.length && (
         <motion.span
           animate={{ opacity: [1, 0, 1] }}
-          transition={{ duration: 0.8, repeat: Infinity }}
+          transition={{ duration: 0.5, repeat: Infinity }} // Reduced from 0.8
           className="inline-block w-[3px] h-[0.8em] bg-current ml-0.5 align-middle rounded-full"
         />
       )}
@@ -67,8 +67,8 @@ const stats = [
 ];
 
 const floatingCards = [
-  { icon: Leaf, text: "Soil Analysis", color: "from-success/80 to-success/40", delay: 0.9 },
-  { icon: Sparkles, text: "AI Powered", color: "from-accent/80 to-accent/40", delay: 1.1 },
+  { icon: Leaf, text: "Soil Analysis", color: "from-success/80 to-success/40", delay: 0.5 }, // Reduced from 0.9
+  { icon: Sparkles, text: "AI Powered", color: "from-accent/80 to-accent/40", delay: 0.7 }, // Reduced from 1.1
 ];
 
 export default function HeroSection() {
@@ -79,7 +79,7 @@ export default function HeroSection() {
         <motion.img
           initial={{ scale: 1.1 }}
           animate={{ scale: 1 }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
+          transition={{ duration: 1.0, ease: "easeOut" }} // Reduced from 1.5
           src={heroImage}
           alt="Smart farming landscape"
           className="w-full h-full object-cover"
@@ -94,12 +94,12 @@ export default function HeroSection() {
       {/* Floating Orbs */}
       <motion.div
         animate={{ y: [-20, 20, -20], x: [-10, 10, -10] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} // Reduced from 8
         className="absolute top-1/4 right-1/4 w-64 h-64 rounded-full bg-accent/10 blur-3xl"
       />
       <motion.div
         animate={{ y: [15, -15, 15], x: [10, -10, 10] }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }} // Reduced from 10
         className="absolute bottom-1/3 right-1/3 w-48 h-48 rounded-full bg-success/10 blur-3xl"
       />
 
@@ -154,7 +154,7 @@ export default function HeroSection() {
                     <motion.span
                       initial={{ width: 0 }}
                       animate={{ width: "100%" }}
-                      transition={{ duration: 0.8, delay: 3.5 }}
+                      transition={{ duration: 0.5, delay: 2.5 }} // Reduced from 0.8, 3.5
                       className="absolute -bottom-1 left-0 h-1 rounded-full bg-gradient-to-r from-orange-400 via-orange-500 to-orange-400"
                     />
                   </span>
@@ -208,7 +208,7 @@ export default function HeroSection() {
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.8 }}
+              transition={{ duration: 0.5, delay: 0.5 }} // Reduced from 0.7, 0.8
               className="grid grid-cols-2 sm:flex sm:flex-wrap gap-4 sm:gap-6 md:gap-8"
             >
               {stats.map((stat, i) => (
@@ -216,7 +216,7 @@ export default function HeroSection() {
                   key={stat.label}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.9 + i * 0.1 }}
+                  transition={{ delay: 0.6 + i * 0.05 }} // Reduced from 0.9, 0.1
                   className="text-center"
                 >
                   <div className="font-mono font-bold text-xl sm:text-2xl md:text-3xl text-background">{stat.value}</div>
@@ -231,7 +231,7 @@ export default function HeroSection() {
             <motion.div
               initial={{ opacity: 0, x: 60, scale: 0.95 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
-              transition={{ duration: 0.8, delay: 0.7 }}
+              transition={{ duration: 0.5, delay: 0.5 }} // Reduced from 0.8, 0.7
               className="relative w-full h-[400px] xl:h-[600px]"
             >
               {/* 3D Scene */}

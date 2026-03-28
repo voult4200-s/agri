@@ -1,6 +1,6 @@
 import { useRef, useMemo, Suspense, useState, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Float, Environment, OrbitControls, useGLTF, ContactShadows } from "@react-three/drei";
+import { Float, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
 /* ── Custom Robot Model ────────────────────────────────── */
@@ -33,7 +33,7 @@ function RobotModel() {
   });
 
   return (
-    <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.3}>
+    <Float speed={1.0} rotationIntensity={0.1} floatIntensity={0.2}>
       <primitive
         ref={ref}
         object={scene}
@@ -47,7 +47,7 @@ function RobotModel() {
 /* ── Glowing Particle Ring ─────────────────────────────── */
 function ParticleRing() {
   const ref = useRef<THREE.Points>(null!);
-  const count = 150;
+  const count = 50; // Reduced from 150 to 50 for better performance
 
   const positions = useMemo(() => {
     const pos = new Float32Array(count * 3);
@@ -75,19 +75,6 @@ function ParticleRing() {
   );
 }
 
-/* ── Mouse Follower Light ──────────────────────────────── */
-function MouseLight() {
-  const light = useRef<THREE.PointLight>(null!);
-  const { viewport } = useThree();
-
-  useFrame(({ pointer }) => {
-    light.current.position.x = (pointer.x * viewport.width) / 2;
-    light.current.position.y = (pointer.y * viewport.height) / 2;
-  });
-
-  return <pointLight ref={light} intensity={2} color="#86efac" distance={8} position={[0, 0, 3]} />;
-}
-
 /* ── Main Scene ────────────────────────────────────────── */
 function Scene() {
   return (
@@ -96,26 +83,15 @@ function Scene() {
       <directionalLight position={[5, 5, 5]} intensity={1} color="#ffffff" />
       <pointLight position={[-3, 2, 2]} intensity={0.8} color="#22c55e" />
       <pointLight position={[3, -1, -2]} intensity={0.4} color="#3b82f6" />
-      <MouseLight />
 
       <RobotModel />
       <ParticleRing />
 
-      {/* Ground shadow */}
-      <ContactShadows
-        position={[0, -2.5, 0]}
-        opacity={0.4}
-        scale={10}
-        blur={2}
-        far={5}
-      />
-
-      <Environment preset="city" />
       <OrbitControls
         enableZoom={false}
         enablePan={false}
         autoRotate
-        autoRotateSpeed={1}
+        autoRotateSpeed={0.5} // Reduced from 1 to 0.5 for better performance
         maxPolarAngle={Math.PI / 1.8}
         minPolarAngle={Math.PI / 3}
       />
@@ -192,7 +168,7 @@ export default function Hero3DScene() {
     <div className="w-full h-full min-h-[500px]" style={{ cursor: "grab" }}>
       <Canvas
         camera={{ position: [0, 0.5, 8], fov: 50 }}
-        dpr={[1, 1.5]}
+        dpr={[1, 1]} // Reduced from [1, 1.5] for better performance
         gl={{ 
           antialias: false, 
           alpha: true,

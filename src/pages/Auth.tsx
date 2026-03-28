@@ -61,12 +61,23 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return; // Prevent multiple submissions
+    
+    if (!loginEmail || !loginPassword) {
+      toast({ title: "Error", description: "Email and password required", variant: "destructive" });
+      return;
+    }
+    
+    setLoading(true);
     try {
-      setLoading(true);
       const result = await signIn(loginEmail, loginPassword);
       if (result.error) {
         toast({ title: "Login Failed", description: result.error, variant: "destructive" });
+      } else {
+        toast({ title: "Login Successful!", description: "Redirecting to dashboard..." });
       }
+    } catch (err) {
+      toast({ title: "Error", description: "An unexpected error occurred", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -74,20 +85,27 @@ export default function Auth() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return; // Prevent multiple submissions
+    
     if (signupStep === 1) {
+      if (!signupEmail || !fullName || !signupPassword) {
+        toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
+        return;
+      }
       if (signupPassword !== confirmPassword) {
-        toast({ title: "Passwords don't match", variant: "destructive" });
+        toast({ title: "Error", description: "Passwords don't match", variant: "destructive" });
         return;
       }
       if (signupPassword.length < 8) {
-        toast({ title: "Password must be at least 8 characters", variant: "destructive" });
+        toast({ title: "Error", description: "Password must be at least 8 characters", variant: "destructive" });
         return;
       }
       setSignupStep(2);
       return;
     }
+    
+    setLoading(true);
     try {
-      setLoading(true);
       const result = await signUp(signupEmail, signupPassword, fullName, {
         mobile: signupPhone || undefined,
         state: state || undefined,
@@ -99,8 +117,15 @@ export default function Auth() {
       if (result.error) {
         toast({ title: "Signup Failed", description: result.error, variant: "destructive" });
       } else {
-        toast({ title: "Account created!", description: result.message || "Welcome to KrishiGrowAI!" });
+        toast({ title: "Success!", description: result.message || "Account created successfully!" });
+        // Auto-switch to login after successful signup
+        setTimeout(() => {
+          setMode("login");
+          setSignupStep(1);
+        }, 1500);
       }
+    } catch (err) {
+      toast({ title: "Error", description: "An unexpected error occurred", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -108,15 +133,24 @@ export default function Auth() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return; // Prevent multiple submissions
+    
+    if (!forgotEmail) {
+      toast({ title: "Error", description: "Please enter your email", variant: "destructive" });
+      return;
+    }
+    
+    setLoading(true);
     try {
-      setLoading(true);
       const result = await resetPassword(forgotEmail);
       if (result.error) {
         toast({ title: "Reset failed", description: result.error, variant: "destructive" });
         return;
       }
-      toast({ title: "Reset link sent!", description: "Please check your email inbox." });
+      toast({ title: "Success!", description: "Reset link sent to your email. Check inbox and spam folder." });
       setMode("login");
+    } catch (err) {
+      toast({ title: "Error", description: "An unexpected error occurred", variant: "destructive" });
     } finally {
       setLoading(false);
     }
