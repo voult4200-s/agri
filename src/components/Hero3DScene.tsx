@@ -9,8 +9,47 @@ function RobotModel() {
   const ref = useRef<THREE.Group>(null!);
   const mixer = useRef<THREE.AnimationMixer | null>(null);
 
-  // Setup animations if available
+  // Setup animations and enhance materials
   useEffect(() => {
+    // Only enhance glow/light parts, keep normal parts unchanged
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const materials = Array.isArray(child.material)
+          ? child.material
+          : [child.material];
+
+        materials.forEach((mat: any) => {
+          if (
+            mat instanceof THREE.MeshStandardMaterial ||
+            mat instanceof THREE.MeshPhysicalMaterial
+          ) {
+            const name = mat.name?.toLowerCase() || "";
+            
+            // Only enhance glow/light parts
+            if (
+              name.includes("glow") ||
+              name.includes("eye") ||
+              name.includes("light") ||
+              name.includes("led")
+            ) {
+              // Bright white for glow parts
+              mat.color = new THREE.Color("#ffffff");
+              mat.emissive = new THREE.Color("#ffffff");
+              mat.emissiveIntensity = 1.0;
+              mat.envMapIntensity = 3.0;
+              mat.roughness = 0.05;
+              mat.metalness = 0.1;
+            } else {
+              // Keep normal parts with their original colors, just brighten
+              mat.envMapIntensity = 2.5;
+              mat.roughness = Math.max(0.2, mat.roughness);
+            }
+            mat.needsUpdate = true;
+          }
+        });
+      }
+    });
+
     if (animations.length > 0 && !mixer.current) {
       mixer.current = new THREE.AnimationMixer(scene);
       animations.forEach((clip) => {
@@ -79,10 +118,11 @@ function ParticleRing() {
 function Scene() {
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[5, 5, 5]} intensity={1} color="#ffffff" />
-      <pointLight position={[-3, 2, 2]} intensity={0.8} color="#22c55e" />
-      <pointLight position={[3, -1, -2]} intensity={0.4} color="#3b82f6" />
+      <ambientLight intensity={1.5} color="#ffffff" />
+      <directionalLight position={[8, 8, 8]} intensity={4.0} color="#ffffff" castShadow />
+      <directionalLight position={[-5, 3, -5]} intensity={2.0} color="#e0f2fe" />
+      <pointLight position={[-4, 4, 2]} intensity={3.0} color="#22c55e" distance={20} />
+      <pointLight position={[4, -2, -3]} intensity={2.0} color="#3b82f6" distance={15} />
 
       <RobotModel />
       <ParticleRing />
