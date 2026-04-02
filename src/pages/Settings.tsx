@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -16,9 +16,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import logo from "@/assets/logo.jpg";
-
 interface Profile {
+  avatar_url: string;
   full_name: string;
   mobile_number: string;
   date_of_birth: string;
@@ -57,6 +56,7 @@ interface Profile {
 }
 
 const defaultProfile: Profile = {
+  avatar_url: "",
   full_name: "", mobile_number: "", date_of_birth: "", gender: "", language_preference: "English",
   state: "", district: "", village: "", pin_code: "",
   farm_size: null, farm_size_unit: "Acres", soil_type: "", ph_level: null, irrigation_type: "", primary_crops: [],
@@ -68,16 +68,26 @@ const defaultProfile: Profile = {
 };
 
 export default function Settings() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUserProfile } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile>(defaultProfile);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
+
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to read image file"));
+      reader.readAsDataURL(file);
+    });
 
   useEffect(() => {
     if (!user) return;
@@ -100,6 +110,7 @@ export default function Settings() {
     setSaving(true);
     const { error } = await supabase.from("profiles").update({
       full_name: profile.full_name,
+      avatar_url: profile.avatar_url || null,
       mobile_number: profile.mobile_number,
       date_of_birth: profile.date_of_birth || null,
       gender: profile.gender,
@@ -139,7 +150,87 @@ export default function Settings() {
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
+      await refreshUserProfile();
       toast({ title: "Profile saved!" });
+    }
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: "Invalid file", description: "Please upload JPG, PNG, or WEBP image.", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Max avatar size is 5MB.", variant: "destructive" });
+      return;
+    }
+
+    const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const filePath = `${user.id}/avatar-${Date.now()}.${fileExt}`;
+    const bucketName = "profile-photos";
+
+    setUploadingAvatar(true);
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) {
+        const bucketMissing = /bucket.*not found/i.test(uploadError.message || "");
+        if (!bucketMissing) {
+          throw uploadError;
+        }
+
+        // Local fallback: save image directly as data URL when storage bucket is unavailable.
+        const dataUrl = await fileToDataUrl(file);
+        const { error: fallbackError } = await supabase
+          .from("profiles")
+          .update({ avatar_url: dataUrl })
+          .eq("user_id", user.id);
+
+        if (fallbackError) {
+          throw fallbackError;
+        }
+
+        setProfile((prev) => ({ ...prev, avatar_url: dataUrl }));
+        await refreshUserProfile();
+        toast({ title: "Photo saved", description: "Bucket missing, so image was saved directly in profile." });
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(filePath);
+
+      const avatarUrl = publicUrlData.publicUrl;
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: avatarUrl })
+        .eq("user_id", user.id);
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      setProfile((prev) => ({ ...prev, avatar_url: avatarUrl }));
+      await refreshUserProfile();
+      toast({ title: "Profile photo updated!" });
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error?.message || "Could not upload profile photo.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingAvatar(false);
+      event.target.value = "";
     }
   };
 
@@ -199,22 +290,41 @@ export default function Settings() {
             <CardContent className="space-y-5">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden border border-border bg-background flex items-center justify-center">
-                  <img
-                    src={logo}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      target.style.display = "none";
-                    }}
-                  />
-                  <span className="hidden text-primary font-heading text-xl font-bold">
-                    {profile.full_name?.charAt(0)?.toUpperCase() || "?"}
-                  </span>
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-primary font-heading text-xl font-bold">
+                      {profile.full_name?.charAt(0)?.toUpperCase() || "?"}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <p className="font-heading font-semibold text-foreground">{profile.full_name || "Your Name"}</p>
                   <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  <div className="mt-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={uploadingAvatar}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="gap-2"
+                    >
+                      {uploadingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                      {uploadingAvatar ? "Uploading..." : "Upload / Change Photo"}
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

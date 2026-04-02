@@ -14,6 +14,7 @@ interface AppUser {
   id: string;
   email: string;
   full_name: string;
+  avatar_url: string | null;
 }
 
 interface AuthUserLike {
@@ -30,6 +31,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string, profile?: SignupProfileInput) => Promise<{ error?: string; message?: string }>;
   resetPassword: (email: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
+  refreshUserProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -40,6 +42,7 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => ({}),
   resetPassword: async () => ({}),
   signOut: async () => {},
+  refreshUserProfile: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -62,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: authUser.id,
       email: authUser.email || "",
       full_name: getFallbackName(authUser),
+      avatar_url: null,
     };
   }, [getFallbackName]);
 
@@ -98,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("full_name, avatar_url")
         .eq("user_id", authUser.id)
         .maybeSingle();
 
@@ -110,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: authUser.id,
         email: authUser.email || "",
         full_name: profile?.full_name || getFallbackName(authUser),
+        avatar_url: profile?.avatar_url || null,
       } satisfies AppUser;
     } catch {
       // Fallback to internal metadata if DB query fails
@@ -304,8 +309,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshUserProfile = useCallback(async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    const mappedUser = await mapUser(data.user);
+    setUser(mappedUser);
+  }, [mapUser]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated: !!user, signIn, signUp, resetPassword, signOut }}>
+    <AuthContext.Provider value={{ user, loading, isAuthenticated: !!user, signIn, signUp, resetPassword, signOut, refreshUserProfile }}>
       {children}
     </AuthContext.Provider>
   );
