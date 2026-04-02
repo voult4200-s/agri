@@ -77,8 +77,8 @@ export default function Navbar() {
               onClick={(e) => handleNavClick(e, link.href)}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                 activeSection === link.href
-                  ? "text-white bg-white/5"
-                  : "text-white/60 hover:text-white hover:bg-white/5"
+                  ? "text-white dark:text-black bg-white/5 dark:bg-black/10"
+                  : "text-white/60 dark:text-black/70 hover:text-white dark:hover:text-black hover:bg-white/5 dark:hover:bg-black/10"
               }`}
             >
               {link.label}
@@ -92,7 +92,7 @@ export default function Navbar() {
           <Button 
             variant="ghost" 
             size="sm" 
-            className="text-white/60 hover:text-white hover:bg-white/5 font-medium"
+            className="text-white/60 dark:text-black/70 hover:text-white dark:hover:text-black hover:bg-white/5 dark:hover:bg-black/10 font-medium"
             asChild
           >
             <Link to="/auth">Login</Link>
@@ -135,8 +135,8 @@ export default function Navbar() {
                   onClick={(e) => handleNavClick(e, link.href)}
                   className={`block px-4 py-3 text-sm font-medium rounded-lg transition-all ${
                     activeSection === link.href
-                      ? "text-white bg-white/5"
-                      : "text-white/60 hover:text-white hover:bg-white/5"
+                      ? "text-white dark:text-black bg-white/5 dark:bg-black/10"
+                      : "text-white/60 dark:text-black/70 hover:text-white dark:hover:text-black hover:bg-white/5 dark:hover:bg-black/10"
                   }`}
                 >
                   {link.label}
@@ -146,7 +146,7 @@ export default function Navbar() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="w-full border-white/10 text-white/70 hover:text-white hover:bg-white/5"
+                  className="w-full border-white/10 dark:border-black/20 text-white/70 dark:text-black/70 hover:text-white dark:hover:text-black hover:bg-white/5 dark:hover:bg-black/10"
                   asChild
                 >
                   <Link to="/auth">Login</Link>
