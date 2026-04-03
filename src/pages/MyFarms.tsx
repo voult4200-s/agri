@@ -4,15 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import {
   Wheat, MapPin, Droplets, Thermometer, Plus, Pencil, Trash2,
   Sprout, Calendar, BarChart3, Leaf, Sun, TrendingUp, X, PlusCircle, Camera, Upload
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Farm {
   id: number;
@@ -26,37 +27,37 @@ interface Farm {
   crops: { name: string; status: string; plantedDate: string; expectedHarvest: string; health: string; image?: string }[];
 }
 
-const initialFarms: Farm[] = [
-  {
-    id: 1, name: "Green Valley Farm", location: "Nashik, Maharashtra", size: 5.5, unit: "Acres", soilType: "Black Cotton Soil", irrigation: "Drip Irrigation",
-    crops: [
-      { name: "Wheat", status: "Growing", plantedDate: "2025-11-15", expectedHarvest: "2026-03-20", health: "Healthy" },
-      { name: "Onion", status: "Harvesting", plantedDate: "2025-09-01", expectedHarvest: "2026-01-15", health: "Good" },
-    ],
-  },
-  {
-    id: 2, name: "Sunrise Fields", location: "Pune, Maharashtra", size: 3.2, unit: "Acres", soilType: "Red Soil", irrigation: "Sprinkler",
-    crops: [
-      { name: "Tomato", status: "Growing", plantedDate: "2025-12-01", expectedHarvest: "2026-03-01", health: "Needs Attention" },
-      { name: "Chilli", status: "Seedling", plantedDate: "2026-01-10", expectedHarvest: "2026-05-15", health: "Healthy" },
-    ],
-  },
-  {
-    id: 3, name: "Riverside Plot", location: "Kolhapur, Maharashtra", size: 8.0, unit: "Acres", soilType: "Alluvial Soil", irrigation: "Canal",
-    crops: [
-      { name: "Sugarcane", status: "Growing", plantedDate: "2025-06-15", expectedHarvest: "2026-06-15", health: "Healthy" },
-    ],
-  },
-];
+const LEGACY_STORAGE_KEY = "agri_farms";
+
+const buildUserFarmStorageKey = (userId: string) => `agri_farms_${userId}`;
+
+const parseFarmsFromStorage = (raw: string | null): Farm[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const isLegacyDemoFarms = (farms: Farm[]) => {
+  if (farms.length !== 3) return false;
+  const names = farms.map((farm) => farm.name).sort();
+  return (
+    names.includes("Green Valley Farm") &&
+    names.includes("Sunrise Fields") &&
+    names.includes("Riverside Plot")
+  );
+};
 
 const healthColor: Record<string, string> = { Healthy: "bg-green-500/10 text-green-700", Good: "bg-blue-500/10 text-blue-700", "Needs Attention": "bg-yellow-500/10 text-yellow-700" };
 const statusColor: Record<string, string> = { Growing: "bg-primary/10 text-primary", Harvesting: "bg-green-500/10 text-green-700", Seedling: "bg-blue-500/10 text-blue-700" };
 
 export default function MyFarms() {
-  const [farms, setFarms] = useState<Farm[]>(() => {
-    const saved = localStorage.getItem("agri_farms");
-    return saved ? JSON.parse(saved) : initialFarms;
-  });
+  const { user } = useAuth();
+  const [farms, setFarms] = useState<Farm[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
   
   const [selectedFarm, setSelectedFarm] = useState<Farm | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -70,8 +71,38 @@ export default function MyFarms() {
   const cropFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    localStorage.setItem("agri_farms", JSON.stringify(farms));
-  }, [farms]);
+    if (!user?.id) {
+      setFarms([]);
+      setIsHydrated(false);
+      return;
+    }
+
+    const userStorageKey = buildUserFarmStorageKey(user.id);
+    const userFarms = parseFarmsFromStorage(localStorage.getItem(userStorageKey));
+
+    if (userFarms.length > 0) {
+      setFarms(userFarms);
+      setIsHydrated(true);
+      return;
+    }
+
+    // Migrate only meaningful old local data; drop hardcoded demo farms.
+    const legacyFarms = parseFarmsFromStorage(localStorage.getItem(LEGACY_STORAGE_KEY));
+    if (legacyFarms.length > 0 && !isLegacyDemoFarms(legacyFarms)) {
+      setFarms(legacyFarms);
+      localStorage.setItem(userStorageKey, JSON.stringify(legacyFarms));
+    } else {
+      setFarms([]);
+    }
+
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    setIsHydrated(true);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !isHydrated) return;
+    localStorage.setItem(buildUserFarmStorageKey(user.id), JSON.stringify(farms));
+  }, [farms, isHydrated, user?.id]);
 
   const totalArea = farms.reduce((sum, f) => sum + f.size, 0);
   const totalCrops = farms.reduce((sum, f) => sum + f.crops.length, 0);
@@ -82,13 +113,24 @@ export default function MyFarms() {
       { name: "Healthy", value: 0, color: "#22c55e" },
       { name: "Good", value: 0, color: "#3b82f6" },
       { name: "Needs Attention", value: 0, color: "#eab308" },
+      { name: "Other", value: 0, color: "#6b7280" },
     ];
     farms.forEach(f => f.crops.forEach(c => {
       const stat = stats.find(s => s.name === c.health);
-      if (stat) stat.value++;
+      if (stat) {
+        stat.value++;
+      } else {
+        const other = stats.find((s) => s.name === "Other");
+        if (other) other.value++;
+      }
     }));
     return stats.filter(s => s.value > 0);
   }, [farms]);
+
+  const totalHealthTracked = useMemo(
+    () => healthStats.reduce((sum, stat) => sum + stat.value, 0),
+    [healthStats]
+  );
 
   const handleSaveFarm = () => {
     if (!newFarm.name || !newFarm.location) {
@@ -213,11 +255,11 @@ export default function MyFarms() {
           <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
             <Plus className="w-4 h-4" />Add New Farm
           </Button>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingId ? "Edit Farm Details" : "Add New Farm"}</DialogTitle>
+          <DialogContent className="w-[96vw] max-w-[96vw] sm:max-w-2xl h-[92vh] sm:h-[88vh] max-h-[92vh] overflow-hidden p-0 flex flex-col">
+            <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/60 bg-background">
+              <DialogTitle className="text-base sm:text-lg">{editingId ? "Edit Farm Details" : "Add New Farm"}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 mt-2">
+            <div className="space-y-4 px-5 py-4 overflow-y-auto flex-1 min-h-0">
               <div className="space-y-2">
                 <Label>Farm Photo</Label>
                 <div className="flex items-center gap-4">
@@ -240,7 +282,7 @@ export default function MyFarms() {
               </div>
               <div><Label>Farm Name</Label><Input placeholder="e.g. Green Valley Farm" value={newFarm.name} onChange={(e) => setNewFarm({ ...newFarm, name: e.target.value })} /></div>
               <div><Label>Location</Label><Input placeholder="e.g. Nashik, Maharashtra" value={newFarm.location} onChange={(e) => setNewFarm({ ...newFarm, location: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><Label>Size</Label><Input type="number" step="0.1" placeholder="5.5" value={newFarm.size} onChange={(e) => setNewFarm({ ...newFarm, size: e.target.value })} /></div>
                 <div><Label>Unit</Label>
                   <Select value={newFarm.unit} onValueChange={(v) => setNewFarm({ ...newFarm, unit: v })}>
@@ -262,7 +304,7 @@ export default function MyFarms() {
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Input placeholder="Crop name" value={newCrop.name} onChange={(e) => setNewCrop({ ...newCrop, name: e.target.value })} />
                   <Select value={newCrop.status} onValueChange={(v) => setNewCrop({ ...newCrop, status: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -277,8 +319,26 @@ export default function MyFarms() {
                   <PlusCircle className="w-3 h-3" /> Add Crop to List
                 </Button>
               </div>
+            </div>
 
-              <Button className="w-full mt-2" onClick={handleSaveFarm}>{editingId ? "Save Changes" : "Create Farm Profile"}</Button>
+            <div className="px-5 py-3 border-t border-border/60 bg-background shrink-0 sticky bottom-0 z-10">
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  className="h-10 w-full whitespace-nowrap"
+                  onClick={() => {
+                    setIsFormOpen(false);
+                    setEditingId(null);
+                    setNewFarm({ name: "", location: "", size: "", unit: "Acres", soilType: "", irrigation: "", image: "", crops: [] });
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button className="h-10 w-full whitespace-nowrap" onClick={handleSaveFarm}>
+                  <span className="sm:hidden">{editingId ? "Save" : "Create"}</span>
+                  <span className="hidden sm:inline">{editingId ? "Save Changes" : "Create Farm Profile"}</span>
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -301,18 +361,39 @@ export default function MyFarms() {
           ))}
         </div>
         <Card className="lg:col-span-1 overflow-hidden">
-          <CardHeader className="p-3 pb-0 text-center"><CardTitle className="text-xs text-muted-foreground uppercase">Health Distribution</CardTitle></CardHeader>
-          <div className="h-32 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={healthStats} innerRadius={25} outerRadius={40} paddingAngle={5} dataKey="value">
-                  {healthStats.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                </Pie>
-                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '10px' }} />
-                <RechartsTooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <CardHeader className="p-3 pb-1 text-center">
+            <CardTitle className="text-xs text-muted-foreground uppercase">Health Distribution</CardTitle>
+          </CardHeader>
+          {totalHealthTracked > 0 ? (
+            <>
+              <div className="h-36 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={healthStats} innerRadius={25} outerRadius={44} paddingAngle={4} dataKey="value">
+                      {healthStats.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                    </Pie>
+                    <RechartsTooltip formatter={(value: number, name: string) => [`${value} crops`, name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="px-3 pb-3 grid grid-cols-2 gap-2">
+                {healthStats.map((stat) => (
+                  <div key={stat.name} className="text-[11px] rounded-md border border-border/60 px-2 py-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: stat.color }} />
+                      {stat.name}
+                    </span>
+                    <span className="font-semibold text-foreground">{stat.value}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="h-36 px-4 pb-3 flex flex-col items-center justify-center text-center">
+              <p className="text-sm font-medium text-foreground">No health data yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Add crops to any farm to see health distribution here.</p>
+            </div>
+          )}
         </Card>
       </div>
 
@@ -368,6 +449,15 @@ export default function MyFarms() {
           ))}
         </AnimatePresence>
       </div>
+
+      {farms.length === 0 && (
+        <Card className="border-dashed border-border/70">
+          <CardContent className="py-10 text-center">
+            <p className="text-base font-semibold text-foreground">No farms added yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Click Add New Farm to create your first farm profile.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Farm Detail Dialog */}
       <Dialog open={!!selectedFarm} onOpenChange={() => setSelectedFarm(null)}>
