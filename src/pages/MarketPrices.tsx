@@ -5,6 +5,7 @@ import {
   Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Filter, IndianRupee, BarChart3, MapPin, Loader2,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,64 +101,54 @@ const crops: CropPrice[] = [
 
 const categories = ["All", "Cereals", "Vegetables", "Oilseeds", "Cash Crops", "Pulses", "Spices"];
 
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`${label} timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+};
+
 const fetchMarketPrices = async () => {
   try {
-    const apiUrl = "https://api.data.gov.in/resource/9ef2731d-91f2-4fd2-a055-14f777e43997";
-    const apiKey = "579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b";
-    const fullUrl = `${apiUrl}?api-key=${apiKey}&format=json&limit=1000&offset=0`;
+    // Primary path: fetch via Supabase edge function (server-side, no browser CORS delays)
+    const result = await withTimeout(
+      supabase.functions.invoke("market-prices"),
+      8000,
+      "market-prices edge function"
+    );
 
-    // Strategy 1: AllOrigins (Most reliable recently)
-    // Using api.allorigins.win with a random query param to bypass their cache
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(fullUrl)}&_=${Date.now()}`;
+    const { data, error } = result;
 
-    console.log(`📡 Fetching live prices via AllOrigins...`);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    try {
-      const response = await fetch(proxyUrl, {
-        method: "GET",
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const wrapper = await response.json();
-        // AllOrigins returns the stringified response in a 'contents' field
-        const data = typeof wrapper.contents === 'string' ? JSON.parse(wrapper.contents) : wrapper.contents;
-
-        if (data && data.records && Array.isArray(data.records) && data.records.length > 0) {
-          console.log(`✅ LIVE prices loaded: ${data.records.length} records`);
-
-          return data.records
-            .map((record: any) => ({
-              commodity: String(record.commodity || "").trim(),
-              modal_price: parseFloat(record.modal_price) || 0,
-              market: String(record.market || "").trim(),
-              state: String(record.state || "").trim(),
-              date: record.arrival_date || new Date().toLocaleDateString(),
-            }))
-            .filter((r: any) => r.modal_price > 0);
-        }
-      }
-    } catch (err) {
-      console.warn("⚠️ AllOrigins fetch failed, trying direct (local) fallback...");
+    if (error) {
+      console.warn("⚠️ market-prices edge function error:", error.message);
+      return [];
     }
 
-    // Phase 2: Try direct fetch (In case user has CORS extension or is on localhost with dev server proxy)
-    try {
-      const directResponse = await fetch(fullUrl);
-      if (directResponse.ok) {
-        const data = await directResponse.json();
-        if (data.records) return data.records;
-      }
-    } catch (e) {
-      // Ignore direct fetch failure
+    if (!data?.records || !Array.isArray(data.records) || data.records.length === 0) {
+      console.warn("⚠️ market-prices returned empty records; using fallback UI data");
+      return [];
     }
 
-    return [];
+    console.log(`✅ LIVE prices loaded via edge function: ${data.records.length} records`);
+
+    return data.records
+      .map((record: any) => ({
+        commodity: String(record.commodity || "").trim(),
+        modal_price: parseFloat(record.modal_price) || 0,
+        market: String(record.market || "").trim(),
+        state: String(record.state || "").trim(),
+        date: record.arrival_date || new Date().toLocaleDateString(),
+      }))
+      .filter((r: any) => r.modal_price > 0);
   } catch (error) {
     console.error("❌ Market API logic error:", error);
     return [];
@@ -176,6 +167,7 @@ export default function MarketPrices() {
     refetchInterval: 300000, // Refetch every 5 minutes (300000 ms)
     staleTime: 240000, // Data is fresh for 4 minutes
     gcTime: 600000, // Cache for 10 minutes
+    refetchOnWindowFocus: false,
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });

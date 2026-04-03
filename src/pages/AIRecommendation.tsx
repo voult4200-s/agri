@@ -90,6 +90,13 @@ interface CropRecommendationApiItem {
   fertilizerPlan?: { stage: string; fertilizer: string; timing: string }[];
 }
 
+interface RecommendationMeta {
+  provider: string;
+  cacheHit: boolean;
+  stale: boolean;
+  fallbackReason?: string;
+}
+
 // ── Step data ──
 const soilTypes = [
   { id: "alluvial", label: "Alluvial", emoji: "🏞️", desc: "Rich & fertile" },
@@ -260,8 +267,28 @@ const mapApiCropToUiCrop = (item: CropRecommendationApiItem, season: string): Cr
   };
 };
 
+const formatProviderLabel = (provider: string) => {
+  switch (provider) {
+    case "gemini":
+      return "Live AI (Gemini)";
+    case "groq":
+      return "Live AI (Groq)";
+    case "cache":
+      return "Cached Recommendation";
+    case "cache-stale":
+      return "Cached (Stale Fallback)";
+    case "rule-fallback":
+      return "Demo Rule-Based Fallback";
+    case "client-demo":
+      return "Local Demo Fallback";
+    default:
+      return provider || "Unknown";
+  }
+};
+
 // ── Component ──
 export default function AIRecommendation() {
+  const STRICT_GEMINI_MODE = true;
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
   const [form, setForm] = useState<FormData>(defaultForm);
@@ -273,6 +300,7 @@ export default function AIRecommendation() {
   const [compareMode, setCompareMode] = useState(false);
   const [compareList, setCompareList] = useState<number[]>([]);
   const [cropResults, setCropResults] = useState<CropResult[]>([]);
+  const [recommendationMeta, setRecommendationMeta] = useState<RecommendationMeta | null>(null);
 
   const update = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -376,6 +404,7 @@ export default function AIRecommendation() {
   const handleAnalyze = async () => {
     setLoading(true);
     setLoadingIdx(0);
+    setRecommendationMeta(null);
 
     // Animate loading messages while waiting for AI
     const interval = setInterval(() => {
@@ -387,7 +416,7 @@ export default function AIRecommendation() {
 
     try {
       const { data, error } = await supabase.functions.invoke("crop-recommend", {
-        body: { farmData: form },
+        body: { farmData: form, options: { strictGemini: STRICT_GEMINI_MODE } },
       });
 
       clearInterval(interval);
@@ -404,14 +433,25 @@ export default function AIRecommendation() {
       }
 
       setCropResults(mappedResults);
+      setRecommendationMeta({
+        provider: data?.provider || "unknown",
+        cacheHit: Boolean(data?.cacheHit),
+        stale: Boolean(data?.stale),
+        fallbackReason: typeof data?.fallbackReason === "string" ? data.fallbackReason : undefined,
+      });
       setLoading(false);
       setShowResults(true);
     } catch (err) {
       clearInterval(interval);
+
       setLoading(false);
       toast({
         title: "AI Recommendation Failed",
-        description: err instanceof Error ? err.message : "Could not get recommendations. Please try again.",
+        description: STRICT_GEMINI_MODE
+          ? "Gemini API is unavailable or not configured. Please check Supabase secrets and try again."
+          : err instanceof Error
+          ? err.message
+          : "Could not get recommendations. Please try again.",
         variant: "destructive",
       });
     }
@@ -425,6 +465,7 @@ export default function AIRecommendation() {
     setCompareMode(false);
     setCompareList([]);
     setCropResults([]);
+    setRecommendationMeta(null);
   };
 
   const toggleCompare = (idx: number) => {
@@ -504,6 +545,8 @@ export default function AIRecommendation() {
   // ── Results screen ──
   if (showResults) {
     const crop = cropResults[selectedCrop];
+    const providerLabel = recommendationMeta ? formatProviderLabel(recommendationMeta.provider) : "Live AI";
+    const usingFallback = recommendationMeta?.provider === "rule-fallback" || recommendationMeta?.provider === "client-demo";
 
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
@@ -517,6 +560,12 @@ export default function AIRecommendation() {
               <h1 className="text-2xl font-heading font-bold text-foreground">AI Crop Recommendations</h1>
             </div>
             <p className="text-sm text-muted-foreground">5 crops analyzed · Ranked by suitability for your farm</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Source: {providerLabel}
+              {recommendationMeta?.cacheHit ? " · Cached" : ""}
+              {recommendationMeta?.stale ? " · Stale fallback" : ""}
+              {usingFallback ? " · Demo mode" : ""}
+            </p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setCompareMode(!compareMode)}>
