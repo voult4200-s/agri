@@ -406,7 +406,7 @@ Guidelines:
           className="flex gap-2 flex-wrap mb-3"
         >
           {selectedMedia.map((m) => (
-            <div key={m.id} className="relative rounded-lg overflow-hidden bg-muted border border-border group w-20 h-20 flex-shrink-0">
+            <div key={m.id} className="relative rounded-xl overflow-hidden bg-muted border border-border group w-20 h-20 flex-shrink-0">
               {m.type === "image" ? (
                 <img src={m.preview} alt="preview" className="w-full h-full object-cover" />
               ) : (
@@ -415,12 +415,14 @@ Guidelines:
                 </div>
               )}
               <button
+                type="button"
+                aria-label="Remove selected media"
                 onClick={() => {
                   const updated = selectedMedia.filter((x) => x.id !== m.id);
                   setSelectedMedia(updated);
                   URL.revokeObjectURL(m.preview);
                 }}
-                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center opacity-100 hover:scale-110 transition-transform"
+                className="absolute top-1 right-1 bg-black/55 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm opacity-80 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 hover:bg-black/70 transition-all"
               >
                 <X className="w-3 h-3" />
               </button>
