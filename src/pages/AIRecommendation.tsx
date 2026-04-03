@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin, FlaskConical, Droplets, Settings2, ChevronRight, ChevronLeft,
-  Locate, Upload, Leaf, Bug, TrendingUp, CalendarDays, IndianRupee,
+  Locate, Leaf, Bug, TrendingUp, CalendarDays, IndianRupee,
   Timer, ShoppingCart, ArrowRight, BarChart3, Check, Sparkles, CloudRain,
   Star, Award, Zap, ThumbsUp, Share2, Download, RefreshCcw,
   Sun, Wind, Thermometer, BarChart2, PieChart,
@@ -17,10 +17,6 @@ interface FormData {
   location: string;
   autoDetect: boolean;
   soilType: string;
-  phLevel: number;
-  nitrogen: number;
-  phosphorus: number;
-  potassium: number;
   farmSize: number;
   sizeUnit: string;
   budget: number;
@@ -35,10 +31,6 @@ const defaultForm: FormData = {
   location: "",
   autoDetect: false,
   soilType: "",
-  phLevel: 6.5,
-  nitrogen: 50,
-  phosphorus: 40,
-  potassium: 45,
   farmSize: 5,
   sizeUnit: "acres",
   budget: 50000,
@@ -69,6 +61,33 @@ interface CropResult {
   monthlyTimeline: { month: string; activity: string; status: string }[];
   pestRisks: { name: string; risk: string; solution: string }[];
   fertilizerPlan: { stage: string; fertilizer: string; timing: string }[];
+}
+
+interface CropRecommendationApiItem {
+  crop_name?: string;
+  suitability_reason?: string;
+  estimated_cost?: string | number;
+  expected_roi?: string | number;
+  growth_duration?: string | number;
+  water_requirement?: string;
+  difficulty_level?: string;
+  name?: string;
+  desc?: string;
+  investment?: string;
+  roi?: string;
+  duration?: string;
+  water?: string;
+  score?: number;
+  yield?: string;
+  price?: string;
+  revenue?: string;
+  profit?: string;
+  nameHi?: string;
+  emoji?: string;
+  tags?: string[];
+  monthlyTimeline?: { month: string; activity: string; status: string }[];
+  pestRisks?: { name: string; risk: string; solution: string }[];
+  fertilizerPlan?: { stage: string; fertilizer: string; timing: string }[];
 }
 
 // ── Step data ──
@@ -120,6 +139,123 @@ const loadingMessages = [
   { text: "Generating recommendations...", icon: Sparkles },
 ];
 
+const cropEmojiMap: Record<string, string> = {
+  rice: "🌾",
+  wheat: "🌾",
+  maize: "🌽",
+  corn: "🌽",
+  cotton: "☁️",
+  sugarcane: "🎋",
+  soybean: "🫘",
+  mustard: "🌻",
+  groundnut: "🥜",
+  potato: "🥔",
+  onion: "🧅",
+  tomato: "🍅",
+  chili: "🌶️",
+  chilli: "🌶️",
+  turmeric: "🟡",
+  pulses: "🫘",
+};
+
+const sanitizeNumber = (value: string | number | undefined, fallback = 0) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return fallback;
+  const parsed = Number(value.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const toCurrencyLabel = (amount: number) => `₹${Math.max(0, Math.round(amount)).toLocaleString("en-IN")}`;
+
+const buildTimeline = (durationLabel: string) => {
+  const totalDays = Math.max(90, sanitizeNumber(durationLabel, 120));
+  const monthCount = Math.max(3, Math.min(6, Math.round(totalDays / 30)));
+  const statuses = ["start", "grow", "grow", "flower", "fruit", "harvest"];
+  const activities = ["Land Prep & Sowing", "Vegetative Growth", "Canopy Development", "Flowering", "Grain/Fruit Filling", "Harvest"];
+  const monthNames = ["M1", "M2", "M3", "M4", "M5", "M6"];
+
+  return Array.from({ length: monthCount }, (_, idx) => ({
+    month: monthNames[idx],
+    activity: activities[idx],
+    status: statuses[idx],
+  }));
+};
+
+const mapApiCropToUiCrop = (item: CropRecommendationApiItem, season: string): CropResult => {
+  if (item.name && item.desc && item.investment && item.roi && item.duration && item.water) {
+    return {
+      name: item.name,
+      nameHi: item.nameHi || item.name,
+      emoji: item.emoji || "🌱",
+      score: item.score || 85,
+      yield: item.yield || "Good yield potential",
+      price: item.price || "Market-linked",
+      duration: item.duration,
+      water: item.water,
+      roi: item.roi,
+      investment: item.investment,
+      revenue: item.revenue || "As per market",
+      profit: item.profit || "Varies by mandi rate",
+      desc: item.desc,
+      tags: item.tags || [season || "season", "AI Recommended"],
+      monthlyTimeline: item.monthlyTimeline || buildTimeline(item.duration),
+      pestRisks: item.pestRisks || [
+        { name: "Leaf Spot", risk: "Medium", solution: "Regular field scouting and preventive spray" },
+        { name: "Aphid", risk: "Low", solution: "Neem-based spray and sticky traps" },
+      ],
+      fertilizerPlan: item.fertilizerPlan || [
+        { stage: "Basal", fertilizer: "NPK as per local recommendation", timing: "At sowing" },
+        { stage: "Top Dress", fertilizer: "Nitrogen split dose", timing: "20-30 DAS" },
+      ],
+    };
+  }
+
+  const cropName = (item.crop_name || "Recommended Crop").trim();
+  const key = cropName.toLowerCase();
+  const emoji = Object.entries(cropEmojiMap).find(([k]) => key.includes(k))?.[1] || "🌱";
+  const estimatedCost = sanitizeNumber(item.estimated_cost, 15000);
+  const roiValue = sanitizeNumber(item.expected_roi, 80);
+  const projectedRevenue = estimatedCost * (1 + roiValue / 100);
+  const projectedProfit = projectedRevenue - estimatedCost;
+  const durationRaw = item.growth_duration ?? "120";
+  const durationLabel = String(durationRaw).toLowerCase().includes("day")
+    ? String(durationRaw)
+    : `${sanitizeNumber(durationRaw, 120)} days`;
+  const water = (item.water_requirement || "medium").toLowerCase();
+  const difficulty = (item.difficulty_level || "medium").toLowerCase();
+
+  return {
+    name: cropName,
+    nameHi: cropName,
+    emoji,
+    score: Math.max(60, Math.min(98, Math.round(60 + roiValue * 0.35))),
+    yield: difficulty === "hard" ? "Moderate to high (with management)" : "Stable yield potential",
+    price: `Est. Cost ${toCurrencyLabel(estimatedCost)}`,
+    duration: durationLabel,
+    water: water.charAt(0).toUpperCase() + water.slice(1),
+    roi: `${Math.max(0, Math.round(roiValue))}%`,
+    investment: toCurrencyLabel(estimatedCost),
+    revenue: toCurrencyLabel(projectedRevenue),
+    profit: toCurrencyLabel(projectedProfit),
+    desc: item.suitability_reason || `${cropName} is suitable for the given farm inputs and current season.`,
+    tags: [
+      `Difficulty: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}`,
+      `Water: ${water.charAt(0).toUpperCase() + water.slice(1)}`,
+      season || "Season-specific",
+    ],
+    monthlyTimeline: buildTimeline(durationLabel),
+    pestRisks: [
+      { name: "Common Pest Pressure", risk: difficulty === "hard" ? "High" : "Medium", solution: "Weekly scouting and integrated pest management" },
+      { name: "Fungal Risk", risk: water === "high" ? "Medium" : "Low", solution: "Seed treatment and drainage management" },
+    ],
+    fertilizerPlan: [
+      { stage: "Basal", fertilizer: "Organic manure + starter dose", timing: "At sowing" },
+      { stage: "Vegetative", fertilizer: "Balanced nutrient top dress", timing: "20-30 DAS" },
+      { stage: "Reproductive", fertilizer: "Potash-focused support", timing: "45-60 DAS" },
+    ],
+  };
+};
+
 // ── Component ──
 export default function AIRecommendation() {
   const { toast } = useToast();
@@ -169,7 +305,15 @@ export default function AIRecommendation() {
       if (error) throw new Error(error.message);
       if (!data?.crops || !Array.isArray(data.crops)) throw new Error("Invalid response from AI");
 
-      setCropResults(data.crops);
+      const mappedResults = (data.crops as CropRecommendationApiItem[])
+        .slice(0, 5)
+        .map((item) => mapApiCropToUiCrop(item, form.season));
+
+      if (mappedResults.length === 0) {
+        throw new Error("No crop recommendations generated");
+      }
+
+      setCropResults(mappedResults);
       setLoading(false);
       setShowResults(true);
     } catch (err) {
@@ -435,7 +579,6 @@ export default function AIRecommendation() {
               <div className="space-y-2 text-sm">
                 <ProfileRow label="Location" value={form.autoDetect ? "Auto-detected" : form.location} />
                 <ProfileRow label="Soil" value={soilTypes.find((s) => s.id === form.soilType)?.label || "—"} />
-                <ProfileRow label="pH Level" value={form.phLevel.toString()} />
                 <ProfileRow label="Farm Size" value={`${form.farmSize} ${form.sizeUnit}`} />
                 <ProfileRow label="Budget" value={`₹${form.budget.toLocaleString()}`} />
                 <ProfileRow label="Water" value={form.waterAvailability || "—"} />
@@ -655,7 +798,7 @@ export default function AIRecommendation() {
         <div className="grid sm:grid-cols-3 gap-3">
           {[
             { icon: Zap, title: "Quick Tip", desc: "Auto-detect location for weather-adjusted results" },
-            { icon: ThumbsUp, title: "Best Practice", desc: "Upload soil test reports for higher accuracy" },
+            { icon: ThumbsUp, title: "Best Practice", desc: "Choose accurate soil type and water availability for better recommendations" },
             { icon: Leaf, title: "Pro Tip", desc: "Try multiple seasons to compare year-round options" },
           ].map((tip) => (
             <div key={tip.title} className="glass-card rounded-xl p-3 flex items-start gap-3">
@@ -735,24 +878,13 @@ function StepSoil({ form, update }: { form: FormData; update: <K extends keyof F
         </div>
       </div>
 
-      <SliderField
-        label="pH Level"
-        value={form.phLevel}
-        onChange={(v) => update("phLevel", v)}
-        min={4} max={9} step={0.1}
-        format={(v) => v.toFixed(1)}
-        hint={form.phLevel < 5.5 ? "⚠️ Acidic — consider liming" : form.phLevel > 7.5 ? "⚠️ Alkaline — consider gypsum" : "✅ Neutral — ideal for most crops"}
-      />
-
-      <div className="grid sm:grid-cols-3 gap-4">
-        <SliderField label="Nitrogen (N)" value={form.nitrogen} onChange={(v) => update("nitrogen", v)} min={0} max={100} format={(v) => `${v} kg/ha`} />
-        <SliderField label="Phosphorus (P)" value={form.phosphorus} onChange={(v) => update("phosphorus", v)} min={0} max={100} format={(v) => `${v} kg/ha`} />
-        <SliderField label="Potassium (K)" value={form.potassium} onChange={(v) => update("potassium", v)} min={0} max={100} format={(v) => `${v} kg/ha`} />
+      <div className="rounded-xl border border-border bg-muted/30 p-4">
+        <p className="text-sm text-foreground font-medium mb-1">No lab values needed</p>
+        <p className="text-xs text-muted-foreground">
+          You do not need pH or NPK values. AI recommendations will be generated using practical farm inputs like location,
+          soil type, season, water availability, and budget.
+        </p>
       </div>
-
-      <button className="flex items-center gap-2 text-sm text-primary hover:underline">
-        <Upload className="w-4 h-4" /> Upload Soil Test Report (optional)
-      </button>
     </div>
   );
 }
