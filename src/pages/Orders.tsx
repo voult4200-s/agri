@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import PaymentDialog from "@/components/PaymentDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -543,6 +543,9 @@ function OrderCard({
             <DialogTitle className="font-heading">
               {type === "order" ? "Order" : "Sale"} Details
             </DialogTitle>
+            <DialogDescription>
+              View complete details about your {type === "order" ? "order" : "sale"} including status, items, and payment information.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             {/* Progress Stepper */}
@@ -767,14 +770,17 @@ export default function Orders() {
 
       let dbOrders: Record<string, unknown>[] = [];
       try {
-        const { data } = await sb
+        const { data, error } = await sb
           .from("marketplace_orders")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
         if (data) dbOrders = data;
-      } catch {
-        console.warn("Could not fetch from Supabase table. Using local data.");
+        if (error && error.code !== "PGRST116") {
+          console.warn("Database fetch error:", error.message);
+        }
+      } catch (err) {
+        console.warn("Could not fetch from Supabase table. Using local data.", err);
       }
 
       const combined = [...localOrders, ...dbOrders];
