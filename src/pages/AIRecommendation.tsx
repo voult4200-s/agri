@@ -682,110 +682,157 @@ export default function AIRecommendation() {
               key={selectedCrop}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-card rounded-2xl p-5"
+              className="relative group rounded-2xl overflow-hidden backdrop-blur-sm"
             >
-              <h3 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
-                <span className="text-2xl">{crop.emoji}</span>
-                {crop.name} — Deep Dive
-              </h3>
-
-              <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="w-full mb-4">
-                  <TabsTrigger value="overview" className="flex-1 text-xs">Overview</TabsTrigger>
-                  <TabsTrigger value="timeline" className="flex-1 text-xs">Timeline</TabsTrigger>
-                  <TabsTrigger value="costs" className="flex-1 text-xs">Costs</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="overview" className="space-y-3 text-sm text-muted-foreground">
-                  <DetailSection icon={CalendarDays} title="Growth Timeline">
-                    {crop.duration} from sowing to harvest. Best planted at the start of {form.season || "Rabi"} season.
-                  </DetailSection>
-                  <DetailSection icon={Bug} title="Pest Risks">
-                    <div className="space-y-1.5 mt-1">
-                      {crop.pestRisks.map((p) => (
-                        <div key={p.name} className="flex items-center justify-between text-xs">
-                          <span>{p.name}</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            p.risk === "High" ? "bg-destructive/10 text-destructive" : p.risk === "Medium" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
-                          }`}>{p.risk}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </DetailSection>
-                  <DetailSection icon={Leaf} title="Fertilizer Schedule">
-                    <div className="space-y-1.5 mt-1">
-                      {crop.fertilizerPlan.map((f) => (
-                        <div key={f.stage} className="text-xs">
-                          <span className="font-medium text-foreground">{f.stage}:</span> {f.fertilizer} — {f.timing}
-                        </div>
-                      ))}
-                    </div>
-                  </DetailSection>
-                  <DetailSection icon={CloudRain} title="Water Needs">
-                    {crop.water} water requirement. Critical irrigation at flowering and pod/fruit formation.
-                  </DetailSection>
-                </TabsContent>
-
-                <TabsContent value="timeline" className="space-y-2">
-                  {crop.monthlyTimeline.map((t, i) => (
-                    <motion.div
-                      key={t.month}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.08 }}
-                      className="flex items-center gap-3"
+              {/* Background gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 group-hover:from-primary/10 group-hover:to-accent/10 transition-colors duration-300" />
+              
+              {/* Border */}
+              <div className="absolute inset-0 border border-primary/10 group-hover:border-primary/20 transition-colors duration-300 rounded-2xl" />
+              
+              <div className="relative p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="font-heading font-bold text-lg text-foreground flex items-center gap-3">
+                    <span className="text-3xl">{crop.emoji}</span>
+                    {crop.name} — Deep Dive
+                  </h3>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-xs font-medium"
+                      onClick={() => {
+                        const text = `${crop.name}\n${crop.desc}`;
+                        navigator.clipboard.writeText(text);
+                        toast({ title: "Copied to clipboard!" });
+                      }}
                     >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
-                        t.status === "harvest" ? "gradient-warm text-secondary-foreground"
-                        : t.status === "flower" ? "bg-accent/15 text-accent"
-                        : t.status === "start" ? "gradient-hero text-primary-foreground"
-                        : "bg-primary/10 text-primary"
-                      }`}>
-                        {t.month.slice(0, 3)}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">{t.activity}</p>
-                      </div>
-                      {i < crop.monthlyTimeline.length - 1 && (
-                        <div className="w-0.5 h-4 bg-border absolute ml-4 mt-10" />
-                      )}
-                    </motion.div>
-                  ))}
-                </TabsContent>
-
-                <TabsContent value="costs" className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 rounded-xl bg-muted/50">
-                      <span className="text-sm text-muted-foreground">Investment</span>
-                      <span className="text-sm font-bold text-foreground">{crop.investment}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 rounded-xl bg-muted/50">
-                      <span className="text-sm text-muted-foreground">Expected Revenue</span>
-                      <span className="text-sm font-bold text-foreground">{crop.revenue}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 rounded-xl bg-success/10">
-                      <span className="text-sm font-medium text-success">Net Profit</span>
-                      <span className="text-sm font-bold text-success">{crop.profit}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 rounded-xl gradient-hero text-primary-foreground">
-                      <span className="text-sm font-medium">ROI</span>
-                      <span className="text-lg font-bold">{crop.roi}</span>
-                    </div>
+                      <Share2 className="w-4 h-4" />
+                      Share
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-xs font-medium"
+                      onClick={() => {
+                        const element = document.createElement("a");
+                        const file = new Blob([`${crop.name}\n\n${crop.desc}`], { type: "text/plain" });
+                        element.href = URL.createObjectURL(file);
+                        element.download = `${crop.name.toLowerCase().replace(/\s+/g, "-")}.txt`;
+                        document.body.appendChild(element);
+                        element.click();
+                        document.body.removeChild(element);
+                        toast({ title: "Download started!" });
+                      }}
+                    >
+                      <Download className="w-4 h-4" />
+                      Download
+                    </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground text-center">*Estimates based on current MSP and market rates. Actual results may vary.</p>
-                </TabsContent>
-              </Tabs>
+                </div>
 
-              <div className="flex gap-2 mt-4">
-                <Button className="flex-1 gradient-warm text-secondary-foreground border-0 hover:opacity-90" size="sm">
-                  <ShoppingCart className="w-4 h-4 mr-1" /> Buy Seeds
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Share2 className="w-4 h-4" />
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Download className="w-4 h-4" />
-                </Button>
+                <Tabs defaultValue="overview" className="w-full">
+                  <TabsList className="w-full mb-6 grid grid-cols-3 bg-muted/30 p-1 rounded-lg">
+                    <TabsTrigger value="overview" className="text-xs font-medium data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Overview</TabsTrigger>
+                    <TabsTrigger value="timeline" className="text-xs font-medium data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Timeline</TabsTrigger>
+                    <TabsTrigger value="costs" className="text-xs font-medium data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Costs</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="overview" className="space-y-3 text-sm text-muted-foreground">
+                    <DetailSection icon={CalendarDays} title="Growth Timeline">
+                      {crop.duration} from sowing to harvest. Best planted at the start of {form.season || "Rabi"} season.
+                    </DetailSection>
+                    <DetailSection icon={Bug} title="Pest Risks">
+                      <div className="space-y-1.5 mt-1">
+                        {crop.pestRisks.map((p) => (
+                          <div key={p.name} className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/30">
+                            <span className="font-medium text-foreground">{p.name}</span>
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
+                              p.risk === "High" ? "bg-destructive/20 text-destructive" : p.risk === "Medium" ? "bg-warning/20 text-warning" : "bg-success/20 text-success"
+                            }`}>{p.risk}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </DetailSection>
+                    <DetailSection icon={Leaf} title="Fertilizer Schedule">
+                      <div className="space-y-1.5 mt-1">
+                        {crop.fertilizerPlan.map((f) => (
+                          <div key={f.stage} className="text-xs p-2 rounded-lg bg-muted/30">
+                            <span className="font-semibold text-foreground">{f.stage}:</span> <span className="text-muted-foreground">{f.fertilizer}</span> — <span className="text-xs text-muted-foreground/70">{f.timing}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </DetailSection>
+                    <DetailSection icon={CloudRain} title="Water Needs">
+                      {crop.water} water requirement. Critical irrigation at flowering and pod/fruit formation.
+                    </DetailSection>
+                  </TabsContent>
+
+                  <TabsContent value="timeline" className="space-y-3">
+                    {crop.monthlyTimeline.map((t, i) => (
+                      <motion.div
+                        key={t.month}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.08 }}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/10 hover:border-primary/20 transition-colors"
+                      >
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 shadow-sm ${
+                          t.status === "harvest" ? "gradient-warm text-white"
+                          : t.status === "flower" ? "bg-accent/20 text-accent font-semibold"
+                          : t.status === "start" ? "gradient-hero text-white"
+                          : "bg-primary/15 text-primary font-semibold"
+                        }`}>
+                          {t.month.slice(0, 3)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">{t.activity}</p>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </TabsContent>
+
+                  <TabsContent value="costs" className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center p-4 rounded-xl bg-gradient-to-r from-muted/30 to-muted/10 border border-primary/10 hover:border-primary/20 transition-colors">
+                        <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <IndianRupee className="w-4 h-4 text-primary" />
+                          Investment
+                        </span>
+                        <span className="text-lg font-bold text-foreground">{crop.investment}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-4 rounded-xl bg-gradient-to-r from-muted/30 to-muted/10 border border-primary/10 hover:border-primary/20 transition-colors">
+                        <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-accent" />
+                          Expected Revenue
+                        </span>
+                        <span className="text-lg font-bold text-foreground">{crop.revenue}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-4 rounded-xl bg-gradient-to-r from-success/10 to-success/5 border border-success/20">
+                        <span className="text-sm font-semibold text-success flex items-center gap-2">
+                          <Check className="w-4 h-4" />
+                          Net Profit
+                        </span>
+                        <span className="text-lg font-bold text-success">{crop.profit}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-4 rounded-xl gradient-hero text-white border border-primary/30">
+                        <span className="text-sm font-semibold flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4" />
+                          ROI
+                        </span>
+                        <span className="text-xl font-bold">{crop.roi}</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground text-center italic">*Estimates based on current MSP and market rates. Actual results may vary.</p>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="flex gap-2 mt-6 pt-4 border-t border-primary/10">
+                  <Button className="flex-1 gradient-warm text-white border-0 hover:opacity-90 font-medium gap-2" size="sm">
+                    <ShoppingCart className="w-4 h-4" />
+                    Buy Seeds
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </div>
