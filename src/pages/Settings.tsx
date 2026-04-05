@@ -122,7 +122,11 @@ export default function Settings() {
           primary_crops: data.primary_crops || [],
         });
 
-        const preferredLanguage = languageNameToCode[data.language_preference || ""] || "en";
+        const languagePreferenceValue =
+          typeof (data as Record<string, unknown>)["language_preference"] === "string"
+            ? ((data as Record<string, unknown>)["language_preference"] as string)
+            : "";
+        const preferredLanguage = languageNameToCode[languagePreferenceValue] || "en";
         void i18n.changeLanguage(preferredLanguage);
 
         const normalizedLanguageName = languageCodeToName[preferredLanguage] || "English";
@@ -130,7 +134,8 @@ export default function Settings() {
       }
       setLoading(false);
     })();
-  }, [i18n, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const saveProfile = async () => {
     if (!user) return;
