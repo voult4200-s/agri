@@ -151,7 +151,7 @@ export default function Navbar() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="w-full border-white/10 dark:border-black/20 text-white/70 dark:text-black/70 hover:text-white dark:hover:text-black hover:bg-white/5 dark:hover:bg-black/10"
+                  className="w-full bg-transparent border-white/20 text-white/80 hover:text-white hover:bg-white/10"
                   asChild
                 >
                   <Link to="/auth">{t("navbar.login")}</Link>

@@ -1154,7 +1154,7 @@ function StepPreferences({ form, update }: { form: FormData; update: <K extends 
 
       <div>
         <label className="text-sm font-medium text-foreground mb-3 block">Crop Purpose</label>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             { id: "commercial", label: "Commercial", emoji: "💰", desc: "Market selling" },
             { id: "personal", label: "Personal", emoji: "🏡", desc: "Self consumption" },

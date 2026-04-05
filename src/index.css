@@ -96,6 +96,7 @@
 
 @layer base {
   * {
+    box-sizing: border-box;
     border-color: hsl(var(--border));
   }
 
@@ -111,6 +112,18 @@
     @apply bg-background text-foreground font-body antialiased;
     overflow-x: hidden;
     min-height: 100svh;
+  }
+
+  #root {
+    min-height: 100svh;
+    overflow-x: clip;
+  }
+
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+    height: auto;
   }
 
   /* GPU-accelerated smooth transitions for interactive elements */
@@ -246,6 +259,8 @@
   /* Prevent horizontal overflow on mobile */
   .container {
     max-width: 100vw;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
   /* Slightly reduce font sizes for very small screens */

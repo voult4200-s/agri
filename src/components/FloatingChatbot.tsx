@@ -199,7 +199,7 @@ Guidelines:
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 w-[72px] h-[72px] rounded-full bg-white dark:bg-slate-900 border-2 border-emerald-700 dark:border-emerald-500 ring-1 ring-emerald-700/55 dark:ring-emerald-500/55 flex items-center justify-center shadow-[0_0_22px_rgba(5,150,105,0.62),0_0_48px_rgba(5,150,105,0.36)] hover:shadow-[0_0_30px_rgba(5,150,105,0.78),0_0_64px_rgba(5,150,105,0.5)] transition-shadow overflow-hidden"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-full bg-white dark:bg-slate-900 border-2 border-emerald-700 dark:border-emerald-500 ring-1 ring-emerald-700/55 dark:ring-emerald-500/55 flex items-center justify-center shadow-[0_0_22px_rgba(5,150,105,0.62),0_0_48px_rgba(5,150,105,0.36)] hover:shadow-[0_0_30px_rgba(5,150,105,0.78),0_0_64px_rgba(5,150,105,0.5)] transition-shadow overflow-hidden"
         aria-label="Toggle chatbot"
       >
         {isOpen ? (
@@ -226,7 +226,7 @@ Guidelines:
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-6 z-50 w-[380px] h-[500px] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            className="fixed z-50 left-2 right-2 sm:left-auto sm:right-6 bottom-[calc(env(safe-area-inset-bottom)+5rem)] sm:bottom-24 w-auto sm:w-[380px] h-[min(70vh,500px)] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           >
             {/* Header */}
             <div className="flex items-center gap-3 p-4 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">

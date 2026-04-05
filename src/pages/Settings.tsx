@@ -297,7 +297,7 @@ export default function Settings() {
     <div>
       <h1 className="font-heading text-2xl font-bold text-foreground mb-6">{t("settings.title")}</h1>
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid grid-cols-3 lg:grid-cols-7 gap-1 h-auto p-1">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-1 h-auto p-1">
           <TabsTrigger value="profile" className="text-xs gap-1"><User className="w-3 h-3" /> Profile</TabsTrigger>
           <TabsTrigger value="farm" className="text-xs gap-1"><Wheat className="w-3 h-3" /> Farm</TabsTrigger>
           <TabsTrigger value="security" className="text-xs gap-1"><Shield className="w-3 h-3" /> Security</TabsTrigger>
