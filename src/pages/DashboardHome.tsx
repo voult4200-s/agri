@@ -29,25 +29,26 @@ export default function DashboardHome() {
     if (!user?.id) return;
 
     let isMounted = true;
+    const sb = supabase as any; // Cast to any for tables not in schema
 
     const fetchCounts = async () => {
       try {
         // Fetch farms count
-        const { count: farmsCount } = await supabase
+        const { count: farmsCount } = await sb
           .from("farms")
           .select("*", { count: "exact", head: true })
           .eq("user_id", user.id);
         if (isMounted) setFarmCount(farmsCount || 0);
 
         // Fetch orders count
-        const { count: ordersCount } = await supabase
+        const { count: ordersCount } = await sb
           .from("orders")
           .select("*", { count: "exact", head: true })
           .eq("user_id", user.id);
         if (isMounted) setOrderCount(ordersCount || 0);
 
         // Fetch storage bookings count
-        const { count: storageCount } = await supabase
+        const { count: storageCount } = await sb
           .from("storage_bookings")
           .select("*", { count: "exact", head: true })
           .eq("user_id", user.id);
