@@ -20,9 +20,9 @@
  
 <div align="center">
  
-[![KrishiGrowAI Demo](https://img.youtube.com/vi/dq--e7mrNkM/maxresdefault.jpg)](https://youtu.be/dq--e7mrNkM)
+[![KrishiGrowAI Demo](https://img.youtube.com/vi/dq--e7mrNkM/maxresdefault.jpg)](https://youtu.be/PhWjIH4LfjI)
  
-**▶️ [Watch the Full Demo on YouTube](https://youtu.be/dq--e7mrNkM)**
+**▶️ [Watch the Full Demo on YouTube](https://youtu.be/PhWjIH4LfjI)**
  
 </div>
 
