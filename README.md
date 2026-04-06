@@ -18,6 +18,16 @@
   <a href="https://vercel.com"><img src="https://img.shields.io/badge/Deployed_on-Vercel-000?style=for-the-badge&logo=vercel" alt="Vercel"></a>
 </p>
 
+## 🎥 Demo Video
+ 
+<div align="center">
+ 
+[![KrishiGrowAI Demo](https://img.youtube.com/vi/dq--e7mrNkM/maxresdefault.jpg)](https://youtu.be/dq--e7mrNkM)
+ 
+**▶️ [Watch the Full Demo on YouTube](https://youtu.be/dq--e7mrNkM)**
+ 
+</div>
+
 # 🎯 The Problem
 
 **Millions of Indian farmers are drowning in a crisis they didn't create.**
@@ -273,15 +283,6 @@ graph LR
 | 👥 **Community Forum** | Farmer network · Knowledge sharing |
 | 💰 **Farm Finance Tools** | ROI calculator · Loan eligibility · Subsidy finder |
 
-</div>
-
-## 🎥 Demo Video
- 
-<div align="center">
- 
-[![KrishiGrowAI Demo](https://img.youtube.com/vi/dq--e7mrNkM/maxresdefault.jpg)](https://youtu.be/dq--e7mrNkM)
- **▶️ [Watch the Full Demo](https://youtu.be/dq--e7mrNkM)**
- 
 </div>
 
 # 🚀 Getting Started :
