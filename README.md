@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/13d1dba7-dc5b-49e1-b939-d5c8295f7ec3" alt="KrishiGrowAI Banner" width="90%">
-</p>
+
 
 <div align="center">
 <a href="https://github.com/your-username/krishigrow">
