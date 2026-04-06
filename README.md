@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/13d1dba7-dc5b-49e1-b939-d5c8295f7ec3" alt="KrishiGrowAI Banner" width="90%">
-</p>
+
 
 <div align="center">
 <a href="https://github.com/your-username/krishigrow">
@@ -17,6 +15,16 @@
   <a href="https://openweathermap.org/"><img src="https://img.shields.io/badge/OpenWeatherMap-Hyperlocal-EB6E4B?style=for-the-badge" alt="OpenWeatherMap"></a>
   <a href="https://vercel.com"><img src="https://img.shields.io/badge/Deployed_on-Vercel-000?style=for-the-badge&logo=vercel" alt="Vercel"></a>
 </p>
+
+## 🎥 Demo Video
+ 
+<div align="center">
+ 
+[![KrishiGrowAI Demo](https://img.youtube.com/vi/dq--e7mrNkM/maxresdefault.jpg)](https://youtu.be/dq--e7mrNkM)
+ 
+**▶️ [Watch the Full Demo on YouTube](https://youtu.be/dq--e7mrNkM)**
+ 
+</div>
 
 # 🎯 The Problem
 
@@ -328,7 +336,7 @@ npm run dev
 ## 🌐 Access the Application :
 
 ```bash
-http://localhost:5173
+https://agri-companion.vercel.app/
 ```
 
 > You're ready to empower farmers. 🌾
