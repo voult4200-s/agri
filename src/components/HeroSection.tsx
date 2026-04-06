@@ -207,7 +207,9 @@ export default function HeroSection() {
                 asChild
               >
                 <a
-                  href="https://www.youtube.com/watch?v=dq--e7mrNkM"
+                  href="#############" // Placeholder URL
+                  target="_blank"
+                  rel="noopener noreferrer"
                   aria-label="Watch Agri Companion demo on YouTube"
                 >
                   <Play className="mr-2 w-4 h-4" />
