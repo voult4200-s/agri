@@ -1,10 +1,40 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Send, Bot, User, Sparkles, Leaf, CloudSun, TrendingUp, Bug, X, Upload, Camera, Plus } from "lucide-react";
+import { Send, Bot, User, Sparkles, Leaf, CloudSun, TrendingUp, Bug, X, Upload, Camera, Plus, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MediaFile } from "@/components/MediaUpload";
 import { MediaData } from "@/components/MediaGallery";
 import { useTranslation } from "react-i18next";
+
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+  message: string;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+  onstart: () => void;
+}
 
 type Msg = { role: "user" | "assistant"; content: string; media?: MediaData[] };
 
@@ -41,15 +71,68 @@ export default function Chatbot() {
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [imageSendingStatus, setImageSendingStatus] = useState<string | null>(null);
   const [edgeFunctionHealthy, setEdgeFunctionHealthy] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [speechLang, setSpeechLang] = useState("en-IN");
+  const [detectedLang, setDetectedLang] = useState<string>("en");
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadMenuRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const inputValueRef = useRef("");
+  const voiceDetectedRef = useRef(false);
+  const voicePrefixRef = useRef("");
+  const voiceFinalTranscriptRef = useRef("");
+  const voiceLatestSpokenRef = useRef("");
+  const sendMessageRef = useRef<(text: string) => Promise<void>>(async () => {});
+
+  const languageMap: Record<string, string> = {
+    "en-IN": "en",
+    "hi-IN": "hi",
+    "mr-IN": "mr",
+    "ta-IN": "ta",
+    "te-IN": "te",
+    "bn-IN": "bn",
+    "gu-IN": "gu",
+    "kn-IN": "kn",
+    "ml-IN": "ml",
+    "pa-IN": "pa",
+  };
+
+  const reverseLanguageMap: Record<string, string> = {
+    "en": "en-IN",
+    "hi": "hi-IN",
+    "mr": "mr-IN",
+    "ta": "ta-IN",
+    "te": "te-IN",
+    "bn": "bn-IN",
+    "gu": "gu-IN",
+    "kn": "kn-IN",
+    "ml": "ml-IN",
+    "pa": "pa-IN",
+  };
+
+  const getLanguageCode = (lang: string): string => {
+    return languageMap[lang] || lang.split("-")[0] || "en";
+  };
+
+  const getSpeechLang = (code: string): string => {
+    return reverseLanguageMap[code] || `${code}-IN`;
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    inputValueRef.current = input;
+  }, [input]);
 
   // Close upload menu when clicking outside
   useEffect(() => {
@@ -63,6 +146,146 @@ export default function Chatbot() {
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showUploadMenu]);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = speechLang;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setInterimTranscript("");
+      voiceDetectedRef.current = false;
+      voiceFinalTranscriptRef.current = "";
+      voiceLatestSpokenRef.current = "";
+      voicePrefixRef.current = inputValueRef.current.trim();
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript.trim();
+        if (!transcript) continue;
+
+        voiceDetectedRef.current = true;
+        if (event.results[i].isFinal) {
+          voiceFinalTranscriptRef.current = `${voiceFinalTranscriptRef.current} ${transcript}`.trim();
+        } else {
+          interim = `${interim} ${transcript}`.trim();
+        }
+      }
+
+      const composedInput = [voicePrefixRef.current, voiceFinalTranscriptRef.current, interim]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      voiceLatestSpokenRef.current = [voiceFinalTranscriptRef.current, interim]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      setInput(composedInput);
+      setInterimTranscript(interim);
+      setDetectedLang(recognition.lang.split("-")[0] || "en");
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+      setInterimTranscript("");
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      setInterimTranscript("");
+
+      const spokenText = voiceLatestSpokenRef.current || voiceFinalTranscriptRef.current;
+      const finalVoiceText = [voicePrefixRef.current, spokenText]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      const shouldSend = voiceDetectedRef.current && spokenText.length > 0 && finalVoiceText.length > 0;
+
+      voiceDetectedRef.current = false;
+      voiceFinalTranscriptRef.current = "";
+      voiceLatestSpokenRef.current = "";
+      voicePrefixRef.current = "";
+
+      if (shouldSend) {
+        void sendMessageRef.current(finalVoiceText);
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.stop();
+    };
+  }, [speechLang]);
+
+  // Update recognition language when changed
+  useEffect(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = speechLang;
+    }
+  }, [speechLang]);
+
+  const startListening = useCallback(() => {
+    if (!recognitionRef.current) {
+      console.error("Speech recognition not supported");
+      return;
+    }
+    recognitionRef.current.start();
+  }, []);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+  }, []);
+
+  const speak = useCallback((text: string, targetLang?: string) => {
+    if (!voiceEnabled || !text) return;
+
+    window.speechSynthesis.cancel();
+
+    const lang = targetLang || speechLang;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    speechSynthRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [voiceEnabled, speechLang]);
+
+  const stopSpeaking = useCallback(() => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  }, []);
+
+  // Auto-speak AI response when voice is enabled
+  useEffect(() => {
+    if (voiceEnabled && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === "assistant" && lastMessage.content) {
+        speak(lastMessage.content);
+      }
+    }
+  }, [messages, voiceEnabled]);
 
   // Handle file selection from input
   const handleFileSelect = (files: FileList | null) => {
@@ -96,6 +319,50 @@ export default function Chatbot() {
     if (!text.trim() && selectedMedia.length === 0) return;
     if (isLoading) return;
 
+    const userLanguage = getLanguageCode(speechLang);
+    const isNonEnglish = userLanguage !== "en";
+    
+    let processedText = text.trim();
+    const originalText = processedText;
+
+    // Translate to English if needed
+    if (isNonEnglish) {
+      setIsTranslating(true);
+      setImageSendingStatus(t("chatbot.status.translating", "Translating..."));
+      try {
+        const translateResp = await fetch(GROQ_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: GROQ_MODEL,
+            messages: [
+              {
+                role: "system",
+                content: `You are a translator. Translate the following text from ${userLanguage} to English. Only respond with the translated text, nothing else.`,
+              },
+              { role: "user", content: processedText },
+            ],
+            temperature: 0.3,
+            max_tokens: 500,
+          }),
+        });
+        
+        if (translateResp.ok) {
+          const translateData = await translateResp.json();
+          const translated = translateData.choices?.[0]?.message?.content;
+          if (translated) {
+            processedText = translated.trim();
+          }
+        }
+      } catch (error) {
+        console.warn("Translation failed, using original text:", error);
+      }
+      setIsTranslating(false);
+    }
+
     const outgoingMedia = [...selectedMedia];
     const hasImage = outgoingMedia.some((m) => m.type === "image");
     
@@ -109,7 +376,7 @@ export default function Chatbot() {
 
     const userMsg: Msg = {
       role: "user",
-      content: text.trim() || t("chatbot.status.analyzingImage", "Analyzing image..."),
+      content: originalText,
       media: mediaData.length > 0 ? mediaData : undefined,
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -305,8 +572,49 @@ Guidelines:
       if (!reply) {
         reply = t("chatbot.errors.emptyReply", "I apologize, I couldn't process that. Please try again.");
       }
+
+      // Translate response back to user's language if needed
+      if (isNonEnglish) {
+        setImageSendingStatus(t("chatbot.status.translatingResponse", "Translating response..."));
+        try {
+          const translateResp = await fetch(GROQ_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${GROQ_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: GROQ_MODEL,
+              messages: [
+                {
+                  role: "system",
+                  content: `You are a translator. Translate the following text from English to ${userLanguage}. Only respond with the translated text, nothing else. Keep it simple and farmer-friendly.`,
+                },
+                { role: "user", content: reply },
+              ],
+              temperature: 0.3,
+              max_tokens: 1024,
+            }),
+          });
+          
+          if (translateResp.ok) {
+            const translateData = await translateResp.json();
+            const translated = translateData.choices?.[0]?.message?.content;
+            if (translated) {
+              reply = translated.trim();
+            }
+          }
+        } catch (error) {
+          console.warn("Response translation failed, using English:", error);
+        }
+      }
       
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+
+      // Auto-speak the response if voice is enabled
+      if (voiceEnabled && reply) {
+        speak(reply, speechLang);
+      }
     } catch (e: any) {
       console.error("Chat error:", e);
       setImageSendingStatus(null);
@@ -328,17 +636,42 @@ Guidelines:
     }
   };
 
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
-          <Sparkles className="w-5 h-5 text-accent" />
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-accent" />
+          </div>
+          <div>
+            <h1 className="text-lg font-heading font-bold text-foreground">{t("chatbot.title", "KrishiAI Assistant")}</h1>
+            <p className="text-xs text-muted-foreground">{t("chatbot.subtitle", "Powered by AI - Ask anything about farming")}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-lg font-heading font-bold text-foreground">{t("chatbot.title", "KrishiAI Assistant")}</h1>
-          <p className="text-xs text-muted-foreground">{t("chatbot.subtitle", "Powered by AI - Ask anything about farming")}</p>
-        </div>
+        
+        {/* Language Selector */}
+        <select
+          value={speechLang}
+          onChange={(e) => setSpeechLang(e.target.value)}
+          className="text-xs bg-muted border border-border rounded-lg px-2 py-1.5 text-foreground outline-none focus:ring-2 ring-primary/30"
+          title={t("chatbot.voice.selectLang", "Select language for speech")}
+        >
+          <option value="en-IN">English</option>
+          <option value="hi-IN">हिन्दी</option>
+          <option value="mr-IN">मराठी</option>
+          <option value="ta-IN">தமிழ்</option>
+          <option value="te-IN">తెలుగు</option>
+          <option value="bn-IN">বাংলা</option>
+          <option value="gu-IN">ગુજરાતી</option>
+          <option value="kn-IN">ಕನ್ನಡ</option>
+          <option value="ml-IN">മലയാളം</option>
+          <option value="pa-IN">ਪੰਜਾਬੀ</option>
+        </select>
       </div>
 
       {/* Messages */}
@@ -386,6 +719,12 @@ Guidelines:
                   : "glass-card text-foreground rounded-bl-md"
               }`}>
                 <p className="whitespace-pre-wrap">{msg.content}</p>
+                {voiceEnabled && msg.role === "assistant" && isSpeaking && (
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/30">
+                    <Volume2 className="w-3 h-3 text-primary animate-pulse" />
+                    <span className="text-xs text-muted-foreground">{t("chatbot.voice.speaking", "Speaking...")}</span>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -411,6 +750,25 @@ Guidelines:
             </div>
           </motion.div>
         )}
+
+        {/* Live Voice Transcription Display - Shows what's being said in real-time */}
+        {isListening && interimTranscript && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex gap-3 items-end"
+          >
+            <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0 border border-red-500/30">
+              <Mic className="w-4 h-4 text-red-500 animate-pulse" />
+            </div>
+            <div className="max-w-[75%] rounded-2xl px-4 py-3 bg-red-500/10 border border-red-500/30 backdrop-blur-sm">
+              <p className="text-sm text-foreground">{interimTranscript}</p>
+              <p className="text-xs text-muted-foreground mt-1 font-medium">🎙️ {t("chatbot.voice.listening", "Listening...")}</p>
+            </div>
+          </motion.div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -528,16 +886,57 @@ Guidelines:
         />
 
         {/* Input Field */}
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder={t("chatbot.inputPlaceholder", "Ask me anything... or upload an image")}
-          className="flex-1 bg-muted rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 ring-primary/30 transition-all"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
+        <div className="flex-1 relative">
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={t("chatbot.inputPlaceholder", "Ask me anything... or upload an image")}
+            className="w-full bg-muted rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 ring-primary/30 transition-all"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Voice Input Button */}
+        <Button
+          onClick={isListening ? stopListening : startListening}
+          variant="ghost"
+          size="icon"
+          className={`h-10 w-10 rounded-xl transition-all ${
+            isListening 
+              ? "bg-red-100 dark:bg-red-900/30 text-red-600 animate-pulse" 
+              : "hover:bg-muted text-primary"
+          }`}
           disabled={isLoading}
-        />
+          title={isListening ? t("chatbot.voice.listening", "Listening...") : t("chatbot.voice.speak", "Click to speak")}
+        >
+          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+        </Button>
+
+        {/* Voice Output Toggle */}
+        <Button
+          onClick={() => {
+            if (voiceEnabled) {
+              setVoiceEnabled(false);
+              stopSpeaking();
+            } else {
+              setVoiceEnabled(true);
+            }
+          }}
+          variant="ghost"
+          size="icon"
+          className={`h-10 w-10 rounded-xl transition-all ${
+            voiceEnabled 
+              ? "bg-primary/10 text-primary" 
+              : "hover:bg-muted text-muted-foreground"
+          }`}
+          disabled={isLoading}
+          title={voiceEnabled ? t("chatbot.voice.outputOn", "Voice output enabled") : t("chatbot.voice.outputOff", "Voice output disabled")}
+        >
+          {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+        </Button>
 
         {/* Send Button */}
         <Button

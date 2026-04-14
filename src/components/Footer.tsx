@@ -30,8 +30,8 @@ export default function Footer() {
             </p>
             <div className="flex flex-col gap-2 text-xs sm:text-sm text-background/60">
               <span className="flex items-center gap-2"><Mail className="w-4 h-4" /> {t("home.footer.contact.email", { defaultValue: "support@krishigrowai.com" })}</span>
-              <span className="flex items-center gap-2"><Phone className="w-4 h-4" /> {t("home.footer.contact.phone", { defaultValue: "+91 1800-XXX-XXXX" })}</span>
-              <span className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {t("home.footer.contact.location", { defaultValue: "New Delhi, India" })}</span>
+              <span className="flex items-center gap-2"><Phone className="w-4 h-4" /> {t("home.footer.contact.phone", { defaultValue: "+91-7908242467" })}</span>
+              <span className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {t("home.footer.contact.location", { defaultValue: "kolkata, India" })}</span>
             </div>
           </div>
 

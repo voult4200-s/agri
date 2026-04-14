@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, Loader2, MessageCircle, X, Leaf, CloudSun, TrendingUp, Bug } from "lucide-react";
+import { Send, Bot, User, Loader2, MessageCircle, X, Leaf, CloudSun, TrendingUp, Bug, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -12,6 +12,11 @@ const USE_EDGE_FUNCTION = import.meta.env.VITE_USE_EDGE_FUNCTION === "true";
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = import.meta.env.VITE_GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+const GROQ_STT_MODEL = import.meta.env.VITE_GROQ_STT_MODEL || "whisper-large-v3-turbo";
+const IS_MOBILE_DEVICE =
+  typeof navigator !== "undefined" &&
+  /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
 const AI_AVATAR_SRC = "/images/ai-avatar.jpeg";
 
 const quickReplies = [
@@ -29,8 +34,23 @@ export default function FloatingChatbot() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [canRecordAudio, setCanRecordAudio] = useState(false);
+  const [isTranscribingVoice, setIsTranscribingVoice] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const speechRecognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+  const inputValueRef = useRef("");
+  const voicePrefixRef = useRef("");
+  const voiceFinalTranscriptRef = useRef("");
+  const voiceDetectedRef = useRef(false);
+  const shouldAutoSendVoiceRef = useRef(false);
+  const sendMessageRef = useRef<(text: string) => Promise<void>>(async () => {});
 
   useEffect(() => {
     if (isOpen) {
@@ -43,6 +63,10 @@ export default function FloatingChatbot() {
       inputRef.current.focus();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    inputValueRef.current = input;
+  }, [input]);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -190,6 +214,120 @@ Guidelines:
     }
   };
 
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setSpeechSupported(false);
+      return;
+    }
+
+    setSpeechSupported(true);
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.lang = navigator.language || "en-IN";
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setSpeechError(null);
+      shouldAutoSendVoiceRef.current = true;
+      voiceDetectedRef.current = false;
+      voiceFinalTranscriptRef.current = "";
+      voicePrefixRef.current = inputValueRef.current.trim();
+    };
+
+    recognition.onresult = (event: any) => {
+      let interimTranscript = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const transcriptChunk = result?.[0]?.transcript?.trim() || "";
+        if (!transcriptChunk) continue;
+
+        voiceDetectedRef.current = true;
+        if (result.isFinal) {
+          voiceFinalTranscriptRef.current = `${voiceFinalTranscriptRef.current} ${transcriptChunk}`.trim();
+        } else {
+          interimTranscript = `${interimTranscript} ${transcriptChunk}`.trim();
+        }
+      }
+
+      const composedInput = [voicePrefixRef.current, voiceFinalTranscriptRef.current, interimTranscript]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      setInput(composedInput);
+    };
+
+    recognition.onerror = (event: any) => {
+      shouldAutoSendVoiceRef.current = false;
+
+      if (event?.error === "aborted") return;
+
+      if (event?.error === "not-allowed") {
+        setSpeechError("Microphone access denied. Please allow microphone permission.");
+        return;
+      }
+
+      setSpeechError("Could not capture voice. Please try again.");
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+
+      const finalVoiceText = [voicePrefixRef.current, voiceFinalTranscriptRef.current]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      const shouldSend =
+        shouldAutoSendVoiceRef.current &&
+        voiceDetectedRef.current &&
+        finalVoiceText.length > 0;
+
+      shouldAutoSendVoiceRef.current = false;
+      voiceDetectedRef.current = false;
+      voiceFinalTranscriptRef.current = "";
+      voicePrefixRef.current = "";
+
+      if (shouldSend) {
+        void sendMessageRef.current(finalVoiceText);
+      }
+    };
+
+    speechRecognitionRef.current = recognition;
+
+    return () => {
+      recognition.abort();
+      speechRecognitionRef.current = null;
+    };
+  }, []);
+
+  const handleVoiceToggle = () => {
+    if (!speechSupported || !speechRecognitionRef.current || isLoading) return;
+
+    setSpeechError(null);
+    try {
+      if (isListening) {
+        speechRecognitionRef.current.stop();
+        return;
+      }
+
+      speechRecognitionRef.current.lang = navigator.language || "en-IN";
+      speechRecognitionRef.current.start();
+    } catch {
+      setSpeechError("Unable to start voice input. Please try again.");
+    }
+  };
+
   return (
     <>
       {/* Floating Chat Button */}
@@ -245,6 +383,15 @@ Guidelines:
               <div className="flex-1">
                 <h2 className="text-sm font-heading font-bold text-foreground">KrishiAI Assistant</h2>
                 <p className="text-xs text-muted-foreground">Powered by AI • Ask anything about farming</p>
+                {isListening && (
+                  <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-red-500/40 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                    </span>
+                    <span>Listening</span>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setIsOpen(false)}
@@ -311,7 +458,8 @@ Guidelines:
 
             {/* Input */}
             <div className="p-4 border-t border-border">
-              <div className="flex gap-2">
+              <div className="space-y-2">
+                <div className="flex gap-2">
                 <input
                   ref={inputRef}
                   type="text"
@@ -320,15 +468,56 @@ Guidelines:
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
-                  disabled={isLoading}
+                  disabled={isLoading || isListening}
                 />
                 <Button
+                  onClick={handleVoiceToggle}
+                  disabled={isLoading || !speechSupported}
+                  variant="outline"
+                  className={`relative rounded-xl px-3 border ${
+                    isListening
+                      ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100 shadow-[0_0_0_3px_rgba(239,68,68,0.12)]"
+                      : "border-border"
+                  }`}
+                  aria-label={isListening ? "Stop voice input" : "Start voice input"}
+                  title={
+                    speechSupported
+                      ? isListening
+                        ? "Stop voice input"
+                        : "Start voice input"
+                      : "Voice input is not supported in this browser"
+                  }
+                >
+                  {isListening && (
+                    <span className="pointer-events-none absolute -inset-1 rounded-xl border border-red-500/60 animate-ping" aria-hidden="true" />
+                  )}
+                  {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </Button>
+                <Button
                   onClick={() => sendMessage(input)}
-                  disabled={isLoading || !input.trim()}
+                  disabled={isLoading || isListening || !input.trim()}
                   className="gradient-hero text-primary-foreground border-0 hover:opacity-90 rounded-xl px-4"
                 >
                   <Send className="w-4 h-4" />
                 </Button>
+                </div>
+
+                {(isListening || speechError || !speechSupported) && (
+                  isListening ? (
+                    <div className="inline-flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-50 px-2.5 py-1.5 text-xs text-red-600">
+                      <div className="flex items-end gap-0.5" aria-hidden="true">
+                        <span className="h-2 w-0.5 rounded bg-red-500 animate-pulse" style={{ animationDelay: "0ms" }} />
+                        <span className="h-3 w-0.5 rounded bg-red-500 animate-pulse" style={{ animationDelay: "120ms" }} />
+                        <span className="h-2 w-0.5 rounded bg-red-500 animate-pulse" style={{ animationDelay: "240ms" }} />
+                      </div>
+                      <span>Listening... speak your question and tap again to stop.</span>
+                    </div>
+                  ) : (
+                    <p className={`text-xs ${speechError ? "text-red-600" : "text-muted-foreground"}`}>
+                      {speechError || "Voice input is not supported in this browser"}
+                    </p>
+                  )
+                )}
               </div>
             </div>
           </motion.div>
