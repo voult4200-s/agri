@@ -450,6 +450,19 @@ export default function Auth() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Admin/Shop/Cold Storage Login Link */}
+          <div className="mt-8 pt-6 border-t border-border">
+            <p className="text-center text-sm text-muted-foreground mb-3">Are you a business owner or admin?</p>
+            <Button
+              type="button"
+              onClick={() => navigate("/admin/auth")}
+              variant="outline"
+              className="w-full"
+            >
+              Admin, Shop & Cold Storage Login →
+            </Button>
+          </div>
         </div>
       </div>
     </div>
